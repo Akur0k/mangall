@@ -1,10 +1,21 @@
 
+// Список глав в шапке: открыть/закрыть по кнопке, закрыть кликом мимо и Esc.
+const cnav = document.getElementById('cnav'), ctog = document.getElementById('ctog');
+ctog.onclick = ev => {
+  ev.stopPropagation();
+  const open = cnav.classList.toggle('open'); ctog.setAttribute('aria-expanded', open);
+  if (open) { const cur = cnav.querySelector('.cur'); if (cur) cur.scrollIntoView({ block: 'center' }); }
+};
+document.addEventListener('click', ev => { if (!cnav.contains(ev.target)) { cnav.classList.remove('open'); ctog.setAttribute('aria-expanded', false); } });
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape') { cnav.classList.remove('open'); if (typeof closeSheet === 'function' && !sheet.hidden) closeSheet(); } });
+
 // Оригинал / Перевод: слой перевода (.t) просто прячется. Выбор запоминается.
 const origBtn = document.getElementById('orig-btn');
 function setOrig(on) {
   document.body.classList.toggle('orig', on);
   origBtn.setAttribute('aria-pressed', on);
-  origBtn.textContent = on ? 'Показать перевод' : 'Показать оригинал';
+  origBtn.title = on ? 'Показать перевод' : 'Показать оригинал';
+  origBtn.querySelector('.lbl').textContent = on ? 'Перевод' : 'Оригинал';
   try { localStorage.setItem('mangall-orig', on ? '1' : ''); } catch (_) {}
 }
 origBtn.onclick = () => setOrig(!document.body.classList.contains('orig'));
