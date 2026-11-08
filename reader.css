@@ -4,7 +4,9 @@ main{max-width:900px;padding:0}
 :root{--s2:#ebe8e2}@media (prefers-color-scheme:dark){:root{--s2:#26262b}}
 body{padding-top:68px}
 .rnav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;gap:12px;padding:16px 24px;
-  background:var(--card);border-bottom:1px solid var(--line)}
+  background:var(--card);border-bottom:1px solid var(--line);transition:transform .2s ease}
+/* Листаешь вниз — шапка уезжает вверх, чтобы не закрывать страницу; чуть вверх — возвращается. */
+body.hdr-off .rnav{transform:translateY(-100%)}
 .rnav .dots{position:absolute;top:0;right:0;width:64px;height:64px;pointer-events:none;opacity:.3;
   background-image:radial-gradient(circle,var(--acc) 1.6px,transparent 1.8px);background-size:15px 15px;
   -webkit-mask-image:radial-gradient(circle at 100% 0%,#000 0%,transparent 65%);mask-image:radial-gradient(circle at 100% 0%,#000 0%,transparent 65%)}
@@ -45,6 +47,7 @@ body.suggest .pg{cursor:crosshair}
 .hint{display:none;position:sticky;top:68px;z-index:5;padding:10px 16px;text-align:center;background:var(--acc);color:#fff;font-size:14px;line-height:1.4}
 @media (max-width:600px){.hint{top:62px}}
 body.suggest .hint{display:block}
+.hint{transition:top .2s ease}body.hdr-off .hint{top:0}
 .mark{position:absolute;width:28px;height:28px;margin:-14px 0 0 -14px;border:3px solid #e11;border-radius:50%;box-shadow:0 0 0 2px #fff;pointer-events:none;z-index:2}
 .sheet{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);width:min(520px,calc(100% - 32px));z-index:10;background:var(--card);
   border:1px solid var(--line);border-radius:10px;padding:14px;box-shadow:0 8px 30px rgba(0,0,0,.25);line-height:1.4}

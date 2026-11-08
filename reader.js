@@ -1,4 +1,16 @@
 
+// Шапка прячется, когда листаешь вниз, и появляется, когда чуть прокрутишь вверх
+// (или дошёл до самого верха / низа главы). Пока открыт список глав — не прячем.
+let lastY = scrollY, acc = 0;
+addEventListener('scroll', () => {
+  const y = scrollY, dy = y - lastY; lastY = y;
+  if (document.getElementById('cnav').classList.contains('open')) return;
+  acc = (Math.sign(dy) === Math.sign(acc)) ? acc + dy : dy; // копим путь в одну сторону — дрожание пальца не дёргает шапку
+  const atTop = y < 80, atEnd = y + innerHeight > document.documentElement.scrollHeight - 40;
+  if (atTop || atEnd || acc < -30) document.body.classList.remove('hdr-off');
+  else if (acc > 30) document.body.classList.add('hdr-off');
+}, { passive: true });
+
 // Список глав в шапке: открыть/закрыть по кнопке, закрыть кликом мимо и Esc.
 const cnav = document.getElementById('cnav'), ctog = document.getElementById('ctog');
 ctog.onclick = ev => {
