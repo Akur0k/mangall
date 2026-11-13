@@ -1,18 +1,223 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MangALL</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;600;700&family=Russo+One&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- шапка и каталог — копия главной mangall-next (localhost:3001): её style.css, common.js, catalog.js;
+     данные каталога — из relay (/catalog, /tags, /suggest) -->
+<link rel="stylesheet" href="next/style.css">
 <style>
-:root{--bg:#f5f4f1;--card:#fff;--fg:#1b1b1f;--mut:#6d6d78;--line:#e4e2dc;--acc:#b3261e}
-@media (prefers-color-scheme:dark){:root{--bg:#121214;--card:#1c1c20;--fg:#ededf0;--mut:#9a9aa6;--line:#2c2c33;--acc:#ff6b5e}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 "Golos Text",system-ui,sans-serif}
-a{color:inherit;text-decoration:none}
-header{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--card)}
-header .logo{font-family:"Russo One",sans-serif;font-size:20px;color:var(--acc)}
-main{max-width:1100px;margin:0 auto;padding:16px}
-.mut{color:var(--mut);font-size:13px}
-</style><title>MangALL</title>
-<style>.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px}
-.card img{width:100%;aspect-ratio:2/3;object-fit:cover;border-radius:8px;background:var(--line);display:block}
-.card b{display:block;margin-top:6px;font-size:14px;line-height:1.3}</style></head><body>
-<header><a class="logo" href="./">MangALL</a></header>
-<main><div class="grid"><a class="card" href="manga/5iEao0M45eru6MZJtNy-x/"><img loading="lazy" src="covers/35513.jpg" alt=""><b>Как Создать Влюблённую (Девушку)</b><span class="mut">23 гл. · 2026-11-06</span></a></div></main></body></html>
+  /* панель входа через Google (auth.js) — то же, что в site.css */
+  .sheet{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);width:min(520px,calc(100% - 32px));z-index:200;background:var(--surface,#fff);
+    border:1px solid var(--border,#ddd);padding:14px;box-shadow:0 8px 30px rgba(0,0,0,.25);line-height:1.4;color:var(--text,#111)}
+  .sheet[hidden]{display:none}.sheet b{display:block;margin-bottom:8px}.sheet .row{display:flex;justify-content:flex-end;gap:8px}
+  .sheet button{font:inherit;padding:8px 14px;border:1px solid var(--border,#ddd);background:transparent;color:inherit;cursor:pointer}
+  #login p{margin:0 0 10px;font-size:14px;opacity:.7}#gbtn{display:flex;justify-content:center;min-height:44px;margin-bottom:10px}
+  #login .me{display:flex;align-items:center;gap:10px;margin-bottom:10px}#login .me img{width:36px;height:36px;border-radius:50%}
+  #login[data-in] .out-only,#login:not([data-in]) .in-only{display:none}
+  #recs .catalog-card-meta{color:var(--accent)}
+  /* ── «Рекомендации» — отдельная полоса: приглушённый красный фон со звёздочками, верхний край
+     скошен (как срезанный уголок кнопок, только во всю ширину) ── */
+  #recs-home {
+    --rec-bg: #7a1a1d; --rec-line: rgba(255,255,255,.18); --slant: 56px;
+    margin-top: var(--space-7); padding-top: calc(var(--slant) + var(--space-6)); padding-bottom: var(--space-8);
+    background: var(--rec-bg) url(next/icons/star-pattern.svg) 0 0 / 96px 96px;
+    background-blend-mode: normal;
+    clip-path: polygon(0 0, 100% var(--slant), 100% 100%, 0 100%);   /* слева выше, к правому краю опускается */
+    color: #fff;
+  }
+  /* узор едва заметный: затемняющий слой поверх картинки-узора */
+  #recs-home::before { content: ''; position: absolute; inset: 0; background: rgba(122,26,29,.93); pointer-events: none; }
+  #recs-home > * { position: relative; }
+  main:has(#recs-home) + .footer { margin-top: 0; }   /* полоса вплотную к подвалу */
+  #recs-home .section-head h2, #recs-home .section-icon { color: #fff; }
+  #recs-home .grid-loading { color: rgba(255,255,255,.8); }
+  #recs-home .catalog-chip, #recs-home .catalog-chip-inner { color: var(--accent); }
+  /* сами карточки — на обычном фоне сайта (как каталог), красное — только заголовок и пагинация вокруг */
+  #recs-home .catalog-grid {
+    position: relative; margin: 0;
+    padding: var(--space-6) var(--section-pad-x); color: var(--text);
+    background: var(--bg) url(next/icons/comic-pattern.svg) 0 0 / 360px 360px;
+  }
+  #recs-home .catalog-pager-btn { background: rgba(255,255,255,.35); }
+  #recs-home .catalog-pager-btn-inner { background: rgba(255,255,255,.12); color: #fff; }
+  #recs-home .catalog-pager-btn:hover:not(:disabled) { background: #fff; }
+  #recs-home .catalog-pager-btn.active, #recs-home .catalog-pager-btn.active .catalog-pager-btn-inner { background: #fff; color: var(--rec-bg); }
+  #recs-home .catalog-pager-ellipsis, #recs-home .catalog-pager-jump { color: rgba(255,255,255,.8); }
+  #recs-home .catalog-pager-input-frame { background: rgba(255,255,255,.35); }
+  #recs-home .catalog-pager-input { background: rgba(255,255,255,.12); color: #fff; }
+  #recs-home .catalog-pager-input::placeholder { color: rgba(255,255,255,.6); }
+  #recs-home .catalog-pager-go { background: #fff; }
+  #recs-home .catalog-pager-go-inner { background: #fff; color: var(--rec-bg); }
+  #recs-home .catalog-pager-go:hover .catalog-pager-go-inner { background: rgba(255,255,255,.85); }
+  /* «Мои вкусы» и опрос — на той же светлой полосе, что карточки; стили опроса из recs.css,
+     ему нужны переменные site.css — сводим их к переменным оформления mangall-next */
+  #recs-home .recs-panel {
+    --card: var(--surface); --line: var(--border); --acc: var(--accent); --fg: var(--text); --mut: var(--text-dim); --s2: var(--surface2);
+    padding: var(--space-6) var(--section-pad-x); color: var(--text);
+    background: var(--bg) url(next/icons/comic-pattern.svg) 0 0 / 360px 360px;
+  }
+  #recs-home .recs-panel .mut { color: var(--text-dim); }
+  #recs-home .recs-panel .btn { font: inherit; padding: 8px 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; }
+  #recs-home .recs-panel .btn.go { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #recs-home .recs-panel h1, #recs-home .recs-panel h2, #recs-home .recs-panel h3 { font-family: 'Unbounded'; }
+  #recs-tastes-btn[hidden] { display: none; }
+</style>
+<link rel="stylesheet" href="recs.css">
+</head>
+<body>
+
+<header class="nav">
+  <div class="footer-dots" aria-hidden="true"></div>
+  <a href="./" class="logo">MangALL</a>
+  <div class="nav-search-wrap">
+    <div class="nav-search-frame">
+      <div class="nav-search">
+        <span class="icon icon-search"></span>
+        <input type="text" id="nav-search-input" placeholder="Найти мангу..." autocomplete="off">
+      </div>
+    </div>
+    <div class="nav-search-dropdown" id="nav-search-dropdown" hidden></div>
+  </div>
+  <div class="nav-account">
+    <button class="account-toggle-frame" id="account-toggle" aria-label="Меню аккаунта" aria-expanded="false" aria-haspopup="true">
+      <span class="account-toggle">
+        <span class="icon icon-user" id="account-toggle-icon"></span>
+        <!-- Показывается вместо иконки-заглушки, когда человек залогинен
+             — см. initAuth() в common.js. Обрезается тем же уголком, что
+             и вся кнопка (.account-toggle clip-path режет и содержимое,
+             отдельный clip-path на самой картинке не нужен). -->
+        
+      </span>
+    </button>
+    <div class="account-menu-arrow" aria-hidden="true"></div>
+    <div class="account-menu" id="account-menu">
+      <div class="account-menu-dots" aria-hidden="true"></div>
+      <a href="./#recs-home" class="account-menu-item">
+        <span class="icon icon-star"></span>
+        <span class="account-menu-label">Рекомендации</span>
+      </a>
+      <div class="account-menu-divider"></div>
+      <button class="account-menu-item" id="theme-toggle">
+        <span class="account-menu-icon">
+          <span class="icon icon-sun"></span>
+          <span class="icon icon-moon"></span>
+        </span>
+        <span class="account-menu-label">Тема</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <section class="section" id="catalog-page">
+    <div class="section-head section-inset">
+      <span class="icon icon-tag section-icon"></span>
+      <h2>Каталог</h2>
+      <!-- Текстовый запрос из поиска в шапке (Enter — см. initNavSearch в
+           common.js/applyCatalogQuery в catalog.js) — своего поля поиска
+           у самого каталога нет, только фильтры по типу/жанру ниже, так
+           что запрос показываем тут же чипсом, с крестиком на сброс. -->
+      <div class="catalog-query-chip" id="catalog-query-chip" hidden>
+        <span id="catalog-query-text"></span>
+        <button type="button" id="catalog-query-clear" aria-label="Очистить поиск">×</button>
+      </div>
+      <!-- Тот же чипс, но для фильтра "только переведённые" — стрелка у
+           "Новые главы" ведёт сюда с ?translated=1#catalog-page (см.
+           #recent-translated-link ниже и onlyTranslated в catalog.js). -->
+      <div class="catalog-query-chip" id="catalog-translated-chip" hidden>
+        <span>Переведённые</span>
+        <button type="button" id="catalog-translated-clear" aria-label="Убрать фильтр">×</button>
+      </div>
+      <!-- Фильтры — не отдельным блоком на странице, а всплывающей
+           панелью от кнопки — тот же приём открытия/закрытия и та же
+           «рамка из фона» со срезанным углом, что у .account-menu в шапке
+           (см. common.js/initFilterMenu в catalog.js и стили ниже). -->
+      <div class="catalog-filter-wrap" id="catalog-filter-wrap">
+        <button type="button" class="catalog-filter-toggle" id="catalog-filter-toggle" aria-expanded="false" aria-haspopup="true">
+          <span class="catalog-filter-toggle-inner">
+            <span class="icon icon-filter"></span>
+            Фильтры
+          </span>
+        </button>
+        <div class="catalog-filter-arrow" aria-hidden="true"></div>
+        <div class="catalog-filters-frame">
+        <div class="catalog-filters" id="catalog-filters">
+          <div class="catalog-filters-dots" aria-hidden="true"></div>
+          <!-- Тип — отдельно от жанров (это orig_language, не genres),
+               хоть по механике тот же чипс-мультивыбор. -->
+          <div class="catalog-filter-group">
+            <span class="catalog-filter-label">Тип</span>
+            <div class="catalog-chips" id="catalog-type-chips">
+              <button type="button" class="catalog-chip" data-type="manga"><span class="catalog-chip-inner">Манга</span></button>
+              <button type="button" class="catalog-chip" data-type="manhwa"><span class="catalog-chip-inner">Манхва</span></button>
+              <button type="button" class="catalog-chip" data-type="manhua"><span class="catalog-chip-inner">Маньхуа</span></button>
+            </div>
+          </div>
+
+          <div class="catalog-filter-group">
+            <span class="catalog-filter-label">Жанры</span>
+            <div class="catalog-chips" id="catalog-tag-chips">
+              <div class="grid-loading">Загрузка тегов...</div>
+            </div>
+            <button type="button" class="catalog-more-tags" id="catalog-more-tags">Ещё теги ↓</button>
+          </div>
+
+          <button type="button" class="catalog-apply" id="catalog-apply">Применить</button>
+        </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Та же пагинация, что и внизу под сеткой — продублирована сверху,
+         чтобы не скроллить через весь список, только чтобы перейти
+         дальше (см. renderPager в catalog.js — рендерит в оба сразу). -->
+    <div class="catalog-pager" id="catalog-pager-top"></div>
+    <div class="catalog-grid" id="catalog-grid">
+      <div class="grid-loading">Загрузка...</div>
+    </div>
+    <div class="catalog-pager" id="catalog-pager-bottom"></div>
+    <!-- При тысячах страниц кликать по соседним номерам, чтобы добраться
+         до условной 2000-й, нереально долго — прямой переход по номеру.
+         Форма — чтобы Enter в поле тоже срабатывал, не только клик. -->
+    <form class="catalog-pager-jump" id="catalog-pager-jump" hidden>
+      <label for="catalog-pager-input">Стр.</label>
+      <div class="catalog-pager-input-frame">
+        <input type="number" id="catalog-pager-input" class="catalog-pager-input" min="1" step="1" inputmode="numeric">
+      </div>
+      <span>из <span id="catalog-pager-total">1</span></span>
+      <button type="submit" class="catalog-pager-go"><span class="catalog-pager-go-inner">Перейти</span></button>
+    </form>
+  </section>
+
+  <!-- Рекомендации — под каталогом и в его оформлении; подборку считает recs.js (SITE.recsMode='grid'),
+       только для вошедших через Google -->
+  <section class="section" id="recs-home">
+    <div class="section-head section-inset">
+      <span class="icon icon-star section-icon"></span>
+      <h2>Рекомендации</h2>
+      <!-- «Мои вкусы» — как кнопка «Фильтры» у каталога; видна вошедшим (recs.js → setTastesBtn) -->
+      <button type="button" class="catalog-filter-toggle" id="recs-tastes-btn" hidden style="margin-left:auto">
+        <span class="catalog-filter-toggle-inner"><span class="icon icon-heart"></span>Мои вкусы</span>
+      </button>
+    </div>
+    <div id="recs"><div class="grid-loading">Загрузка...</div></div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="footer-dots" aria-hidden="true"></div>
+  <span class="logo footer-logo">MangALL</span>
+  <p>Читай любимую мангу, манхву и маньхуа с переводом от сообщества.</p>
+</footer>
+
+<script src="next/common.js"></script>
+<script src="next/catalog.js"></script>
+<script>window.SITE = {"root": "", "api": "https://mangall-suggest.nake000071.workers.dev", "gclient": "457192894158-51mr293gi026t8k3iph3o9i4m57ouo19.apps.googleusercontent.com", "recsMode": "grid"};</script><script src="auth.js"></script><script src="recs.js"></script><script src="https://accounts.google.com/gsi/client" async></script>
+</body>
+</html>

@@ -1,0 +1,49 @@
+/* Рекомендации: опрос вкусов, карточки, «Мои вкусы», блок «Похожие». */
+#recs h1{font-size:22px;margin:4px 0 8px}#recs h2{font-size:17px;margin:20px 0 8px}#recs h3{font-size:14px;margin:8px 0}
+.rhead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:16px;margin-top:12px}
+.rc{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:8px;overflow:hidden;transition:opacity .25s,transform .25s}
+.rc.gone{opacity:0;transform:scale(.95)}
+.rc .cv{position:relative;display:block;aspect-ratio:2/3;background:var(--line);overflow:hidden}
+.rc .cv img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}  /* рамка строго 2:3, лишнее обрезается */
+.rc .our{position:absolute;left:6px;top:6px;padding:2px 8px;border-radius:4px;background:var(--acc);color:#fff;font-size:12px;font-weight:600}
+.rc .rb{display:flex;flex-direction:column;gap:2px;padding:8px 10px 10px;flex:1}
+.rc .tt{font-weight:600;font-size:14px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.rc .tt:hover{color:var(--acc)}
+.rc .why{font-size:12px;color:var(--acc);margin-top:2px}
+.rc .acts{display:flex;gap:6px;align-items:center;margin-top:auto;padding-top:8px}
+.rc .acts .btn{flex:1;padding:6px 8px;font-size:13px;text-align:center}
+.rc .btn.want[aria-pressed=true]{border-color:var(--acc);color:var(--acc)}
+.rc .like[aria-pressed=true]>span{color:var(--acc)}
+.undo{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px;border:1px dashed var(--line);border-radius:8px;font-size:13px;color:var(--mut)}
+.more{text-align:center;margin:20px 0}
+.gate{max-width:520px;margin:40px auto;text-align:center}.gate .btn{margin-top:8px}
+/* опрос */
+.quiz{max-width:760px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font:inherit;font-size:14px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer}
+.chip[data-s="1"]{background:var(--acc);border-color:var(--acc);color:#fff}
+.chip[data-s="-1"]{text-decoration:line-through;color:var(--mut);border-style:dashed}
+.adult{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:14px}
+.search{width:100%;font:inherit;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--fg)}
+.found{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.fd{display:flex;align-items:center;gap:10px;text-align:left;font:inherit;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--fg);cursor:pointer}
+.fd img{width:32px;height:46px;object-fit:cover;border-radius:3px}.fd small{display:block}
+.picked{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.pk{display:inline-flex;align-items:center;gap:6px;padding:4px 6px 4px 10px;border-radius:999px;background:var(--s2);font-size:13px}
+.pk button{border:0;background:none;color:var(--mut);cursor:pointer;font:inherit}
+.quiz .row,.tastes .row{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:20px}
+/* мои вкусы */
+.tastes .cols{display:grid;grid-template-columns:1fr 1fr;gap:24px}@media (max-width:600px){.tastes .cols{grid-template-columns:1fr}}
+.bar{position:relative;margin:4px 0;padding:4px 8px;font-size:13px}
+.bar i{position:absolute;left:0;top:0;bottom:0;background:var(--acc);opacity:.18;border-radius:4px}
+.bar span{position:relative}
+#recs.similar{margin-top:28px}
+.grid[hidden],.more[hidden],.panel[hidden]{display:none}
+/* обложка не загрузилась — название на фоне вместо пустого прямоугольника */
+.rc .cv.noimg{display:flex;align-items:center;justify-content:center;padding:12px;text-align:center;font-weight:600;font-size:14px;color:var(--mut)}
+.rc .alt{font-size:12px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+/* переключатель «Только с readmanga» */
+.rmonly{display:inline-flex;align-items:center;gap:6px;margin-left:auto;font-size:14px;cursor:pointer;user-select:none}
+.rmonly input{accent-color:var(--acc);width:16px;height:16px;margin:0}
+.rmnote{margin:8px 0}

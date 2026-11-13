@@ -1,6 +1,8 @@
+// Читалка: шапка (прячется при прокрутке / по тапу), список глав, «Оригинал / Перевод»,
+// «Предложить правку» (только вошедшим через Google, см. auth.js) и отметка
+// «дочитал главу» для рекомендаций. Настройки главы — window.READER (manga, chapter, al).
 
-// Шапка прячется, когда листаешь вниз, и появляется, когда чуть прокрутишь вверх
-// (или дошёл до самого верха / низа главы). Пока открыт список глав — не прячем.
+// --- шапка ---------------------------------------------------------------
 let lastY = scrollY, acc = 0;
 addEventListener('scroll', () => {
   const y = scrollY, dy = y - lastY; lastY = y;
@@ -10,8 +12,16 @@ addEventListener('scroll', () => {
   if (atTop || atEnd || acc < -30) document.body.classList.remove('hdr-off');
   else if (acc > 30) document.body.classList.add('hdr-off');
 }, { passive: true });
+// Тап по странице манги — показать/спрятать шапку (в режиме правки тап ставит точку).
+document.querySelector('main').addEventListener('click', ev => {
+  if (document.body.classList.contains('suggest') || ev.target.closest('a,button,input,textarea')) return;
+  if (!ev.target.closest('.pg,.promo')) return;
+  if (document.getElementById('cnav').classList.contains('open')) return; // этот тап закрывает список глав
+  document.body.classList.toggle('hdr-off');
+  acc = 0;
+});
 
-// Список глав в шапке: открыть/закрыть по кнопке, закрыть кликом мимо и Esc.
+// --- список глав ----------------------------------------------------------
 const cnav = document.getElementById('cnav'), ctog = document.getElementById('ctog');
 ctog.onclick = ev => {
   ev.stopPropagation();
@@ -19,9 +29,8 @@ ctog.onclick = ev => {
   if (open) { const cur = cnav.querySelector('.cur'); if (cur) cur.scrollIntoView({ block: 'center' }); }
 };
 document.addEventListener('click', ev => { if (!cnav.contains(ev.target)) { cnav.classList.remove('open'); ctog.setAttribute('aria-expanded', false); } });
-document.addEventListener('keydown', ev => { if (ev.key === 'Escape') { cnav.classList.remove('open'); if (typeof closeSheet === 'function' && !sheet.hidden) closeSheet(); } });
 
-// Оригинал / Перевод: слой перевода (.t) просто прячется. Выбор запоминается.
+// --- оригинал / перевод -----------------------------------------------------
 const origBtn = document.getElementById('orig-btn');
 function setOrig(on) {
   document.body.classList.toggle('orig', on);
@@ -33,20 +42,27 @@ function setOrig(on) {
 origBtn.onclick = () => setOrig(!document.body.classList.contains('orig'));
 try { if (localStorage.getItem('mangall-orig')) setOrig(true); } catch (_) {}
 
-// Предложить правку: включить режим → нажать на место ошибки → написать → отправить.
+// --- предложить правку ------------------------------------------------------
 const sugBtn = document.getElementById('sug-btn'), sheet = document.getElementById('sheet');
-const ta = sheet.querySelector('textarea'), nameIn = sheet.querySelector('input[name=name]');
+const ta = sheet.querySelector('textarea');
 const msg = sheet.querySelector('.msg'), sendBtn = sheet.querySelector('.go');
 let pick = null, mark = null;
-try { nameIn.value = localStorage.getItem('mangall-name') || ''; } catch (_) {}
 function setSuggest(on) {
   document.body.classList.toggle('suggest', on);
   sugBtn.setAttribute('aria-pressed', on);
   if (!on) closeSheet();
 }
-sugBtn.onclick = () => setSuggest(!document.body.classList.contains('suggest'));
+sugBtn.onclick = () => {
+  if (document.body.classList.contains('suggest')) return setSuggest(false);
+  MAuth.require('Войдите через Google, чтобы предлагать правки. Ваше имя и почту увидит только владелец сайта вместе с правкой.', () => setSuggest(true));
+};
+MAuth.onChange(u => {
+  sheet.querySelector('.who').textContent = u ? `Отправится от: ${u.name} (${u.email})` : '';
+  if (!u) setSuggest(false);
+});
 function closeSheet() { sheet.hidden = true; if (mark) mark.remove(); mark = pick = null; msg.textContent = ''; }
 sheet.querySelector('.cancel').onclick = closeSheet;
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape') { cnav.classList.remove('open'); if (!sheet.hidden) closeSheet(); } });
 document.querySelectorAll('.pg').forEach(pg => pg.addEventListener('click', ev => {
   if (!document.body.classList.contains('suggest')) return;
   const r = pg.getBoundingClientRect();
@@ -80,20 +96,37 @@ sendBtn.onclick = async () => {
   if (!pick) return;
   const text = ta.value.trim();
   if (!text) { msg.textContent = 'Напишите, что исправить.'; ta.focus(); return; }
+  if (!MAuth.user) { MAuth.open('Вход устарел — войдите ещё раз, правка не потеряется.', () => sendBtn.click()); return; }
   sendBtn.disabled = true; msg.textContent = 'Отправляю…';
   try {
     const fd = new FormData();
-    fd.append('text', text); fd.append('name', nameIn.value.trim());
+    fd.append('text', text); fd.append('credential', MAuth.cred);
     fd.append('website', sheet.querySelector('.hp').value);
     fd.append('manga', READER.manga); fd.append('chapter', READER.chapter); fd.append('page', pick.pg.dataset.n);
     fd.append('link', location.href.split('#')[0] + '#p' + pick.pg.dataset.n);
-    try { localStorage.setItem('mangall-name', nameIn.value.trim()); } catch (_) {}
     const img = await crop(pick); if (img) fd.append('image', img, 'page.jpg');
-    const r = await fetch(READER.suggest, { method: 'POST', body: fd });
+    const r = await fetch(SITE.api + '/suggest', { method: 'POST', body: fd });
     const d = await r.json().catch(() => ({}));
+    if (r.status === 401 && d.login) { MAuth.open((d.error || 'Нужно войти') + ' — войдите ещё раз, правка не потеряется.', () => sendBtn.click()); msg.textContent = ''; return; }
     if (!r.ok || !d.ok) throw new Error(d.error || r.status);
     ta.value = ''; closeSheet(); setSuggest(false);
     alert('Спасибо! Правка отправлена.');
   } catch (e) { msg.textContent = 'Не получилось отправить: ' + e.message; }
   finally { sendBtn.disabled = false; }
 };
+
+// --- «дочитал главу» → рекомендации ----------------------------------------
+// Когда на экране появилась последняя страница главы — один раз отмечаем read.
+(function () {
+  const pages = document.querySelectorAll('.pg');
+  if (!READER.al || !pages.length) return;
+  const key = 'mangall-read-' + READER.al + '-' + READER.chapter;
+  const io = new IntersectionObserver(es => {
+    if (!es.some(e => e.isIntersecting)) return;
+    io.disconnect();
+    try { if (localStorage.getItem(key)) return; localStorage.setItem(key, '1'); } catch (_) {}
+    MAuth.track('read', READER.al, READER.chapter);
+    MAuth.flush(false);
+  }, { threshold: 0.3 });
+  io.observe(pages[pages.length - 1]);
+})();

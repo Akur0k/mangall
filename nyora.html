@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MangALL — источники Nyora</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Оформление как у mangall-next: её style.css. Данные — из локального моста Nyora (nyora/bridge.py, :3010). -->
+<link rel="stylesheet" href="next/style.css">
+<style>
+  .ny-wrap { max-width: 1200px; margin: 0 auto; padding: 24px 16px 80px; }
+  .ny-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 18px; }
+  .ny-bar select, .ny-bar input { font: inherit; padding: 9px 12px; border: 1px solid var(--border, #ddd);
+    background: var(--surface, #fff); color: inherit; min-width: 0; }
+  .ny-bar input { flex: 1 1 240px; }
+  .ny-bar button, .ny-btn { font: inherit; padding: 9px 14px; border: 1px solid var(--border, #ddd);
+    background: transparent; color: inherit; cursor: pointer; }
+  .ny-bar button.on { background: var(--text, #111); color: var(--surface, #fff); }
+  .ny-status { font-size: 14px; opacity: .7; margin: 8px 0 16px; min-height: 1em; }
+  .ny-err { color: #b3261e; }
+  .ny-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; }
+  .ny-card { cursor: pointer; text-decoration: none; color: inherit; }
+  .ny-card img { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; background: var(--surface2, #eee); display: block; }
+  .ny-card b { display: block; margin-top: 6px; font-size: 14px; line-height: 1.3; }
+  .ny-detail { display: grid; grid-template-columns: 220px 1fr; gap: 24px; }
+  .ny-detail img { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; background: var(--surface2, #eee); }
+  .ny-detail h1 { font: 700 26px 'Unbounded', sans-serif; margin: 0 0 10px; }
+  .ny-desc { font-size: 15px; line-height: 1.5; white-space: pre-line; max-height: 260px; overflow: auto; }
+  .ny-chapters { list-style: none; padding: 0; margin: 18px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+  .ny-chapters button { width: 100%; text-align: left; font: inherit; font-size: 14px; padding: 9px 10px;
+    border: 1px solid var(--border, #ddd); background: transparent; color: inherit; cursor: pointer; }
+  .ny-reader { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .ny-reader img { max-width: 100%; height: auto; display: block; }
+  .ny-reader-nav { display: flex; gap: 8px; justify-content: center; margin: 16px 0; flex-wrap: wrap; }
+  @media (max-width: 720px) { .ny-detail { grid-template-columns: 1fr; } .ny-detail img { max-width: 220px; } }
+</style>
+</head>
+<body>
+
+<header class="snav" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px">
+  <a class="logo" href="./" style="font:700 22px 'Unbounded',sans-serif;color:inherit;text-decoration:none">MangALL</a>
+  <a href="./" style="color:inherit;font-size:14px">← каталог</a>
+</header>
+
+<main class="ny-wrap">
+  <div id="ny-list">
+    <div class="ny-bar">
+      <select id="ny-src" aria-label="Источник"><option>загрузка источников…</option></select>
+      <button id="ny-mode-pop" class="on" type="button">Популярное</button>
+      <input id="ny-q" type="search" placeholder="Поиск по выбранному источнику" autocomplete="off">
+      <button id="ny-search" type="button">Найти</button>
+    </div>
+    <div class="ny-status" id="ny-status"></div>
+    <div class="ny-grid" id="ny-grid"></div>
+    <div style="margin-top:18px;text-align:center"><button class="ny-btn" id="ny-more" type="button" hidden>Ещё</button></div>
+  </div>
+
+  <div id="ny-detail" hidden></div>
+  <div id="ny-reader" hidden></div>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  // Адрес моста Nyora. Меняется через window.NYORA_API, если нужен другой.
+  var API = window.NYORA_API || "http://127.0.0.1:3010/api";
+  var $ = function (id) { return document.getElementById(id); };
+  var state = { src: "", mode: "popular", q: "", page: 1, hasNext: false, entries: [] };
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function status(text, isErr) {
+    var el = $("ny-status");
+    el.textContent = text || "";
+    el.className = "ny-status" + (isErr ? " ny-err" : "");
+  }
+  function api(path, params) {
+    var qs = Object.keys(params || {}).map(function (k) {
+      return encodeURIComponent(k) + "=" + encodeURIComponent(params[k]);
+    }).join("&");
+    return fetch(API + path + (qs ? "?" + qs : "")).then(function (r) {
+      return r.json().then(function (j) {
+        if (!r.ok || j.error) throw new Error(j.error || ("HTTP " + r.status));
+        return j;
+      });
+    });
+  }
+  function show(which) {
+    $("ny-list").hidden = which !== "list";
+    $("ny-detail").hidden = which !== "detail";
+    $("ny-reader").hidden = which !== "reader";
+    window.scrollTo(0, 0);
+  }
+
+  // --- источники ---
+  function loadSources() {
+    api("/sources", {}).then(function (j) {
+      var sel = $("ny-src");
+      // русскоязычные вперёд, остальные дальше
+      var list = j.sources.slice().sort(function (a, b) {
+        var ra = a.lang === "ru" ? 0 : 1, rb = b.lang === "ru" ? 0 : 1;
+        return ra - rb || a.name.localeCompare(b.name);
+      });
+      sel.innerHTML = list.map(function (s) {
+        return '<option value="' + esc(s.id) + '">' + esc(s.name) + " (" + esc(s.lang) + ")</option>";
+      }).join("");
+      // по умолчанию — MangaLib (проверен: каталог, главы и картинки); иначе первый русский
+      var ru = list.filter(function (s) { return s.id === "parser:MANGALIB"; })[0] ||
+               list.filter(function (s) { return s.lang === "ru"; })[0];
+      sel.value = (ru || list[0]).id;
+      state.src = sel.value;
+      load(true);
+    }).catch(function (e) {
+      status("Мост Nyora не отвечает: " + e.message + ". Запусти nyora/bridge.py (порт 3010).", true);
+    });
+  }
+
+  // --- список (популярное / поиск) ---
+  function load(reset) {
+    if (reset) { state.page = 1; state.entries = []; $("ny-grid").innerHTML = ""; }
+    status("загрузка…");
+    var p = state.mode === "search"
+      ? api("/search", { src: state.src, q: state.q, page: state.page })
+      : api("/popular", { src: state.src, page: state.page });
+    p.then(function (j) {
+      state.hasNext = j.has_next;
+      state.entries = state.entries.concat(j.entries);
+      renderGrid(j.entries);
+      $("ny-more").hidden = !state.hasNext;
+      status(state.entries.length ? "" : "ничего не найдено");
+    }).catch(function (e) { status("Ошибка: " + e.message, true); });
+  }
+  function renderGrid(items) {
+    $("ny-grid").insertAdjacentHTML("beforeend", items.map(function (m, i) {
+      var idx = state.entries.length - items.length + i;
+      return '<a class="ny-card" href="#" data-idx="' + idx + '">' +
+        (m.cover ? '<img loading="lazy" referrerpolicy="no-referrer" src="' + esc(API.replace(/\/api$/, "") + m.cover) + '" alt="">' :
+          '<img alt="" style="visibility:hidden">') +
+        "<b>" + esc(m.title) + "</b></a>";
+    }).join(""));
+  }
+
+  $("ny-grid").addEventListener("click", function (e) {
+    var a = e.target.closest("[data-idx]");
+    if (!a) return;
+    e.preventDefault();
+    openManga(state.entries[+a.getAttribute("data-idx")]);
+  });
+  $("ny-src").addEventListener("change", function () { state.src = this.value; load(true); });
+  $("ny-more").addEventListener("click", function () { state.page++; load(false); });
+  $("ny-mode-pop").addEventListener("click", function () {
+    state.mode = "popular"; this.classList.add("on"); $("ny-search").classList.remove("on"); load(true);
+  });
+  $("ny-search").addEventListener("click", function () {
+    state.q = $("ny-q").value.trim();
+    if (!state.q) return;
+    state.mode = "search";
+    $("ny-mode-pop").classList.remove("on"); this.classList.add("on");
+    load(true);
+  });
+  $("ny-q").addEventListener("keydown", function (e) { if (e.key === "Enter") $("ny-search").click(); });
+
+  // --- карточка манги ---
+  function openManga(m) {
+    show("detail");
+    var box = $("ny-detail");
+    box.innerHTML = '<p class="ny-status">загрузка…</p>';
+    api("/details", { src: state.src, url: m.url, id: m.id || "" }).then(function (j) {
+      var mg = j.manga, chs = j.chapters.slice().reverse();  // новые сверху
+      box.innerHTML =
+        '<p><a href="#" id="ny-back">← назад</a></p>' +
+        '<div class="ny-detail">' +
+          (mg.cover ? '<img referrerpolicy="no-referrer" src="' + esc(API.replace(/\/api$/, "") + mg.cover) + '" alt="">' : '<div></div>') +
+          '<div><h1>' + esc(mg.title) + '</h1>' +
+          (mg.authors && mg.authors.length ? '<p>' + esc(mg.authors.join(", ")) + '</p>' : '') +
+          '<div class="ny-desc">' + esc(mg.description || "") + '</div>' +
+          '<div class="ny-status">глав: ' + chs.length + '</div>' +
+          '<ul class="ny-chapters" id="ny-chs">' + chs.map(function (c, i) {
+            return '<li><button type="button" data-ch="' + i + '">' + esc((c.number != null ? "Глава " + c.number : c.title) || "Глава") + '</button></li>';
+          }).join("") + '</ul></div></div>';
+      $("ny-back").addEventListener("click", function (e) { e.preventDefault(); show("list"); });
+      $("ny-chs").addEventListener("click", function (e) {
+        var b = e.target.closest("[data-ch]");
+        if (b) openChapter(chs[+b.getAttribute("data-ch")], chs, mg);
+      });
+    }).catch(function (e) { box.innerHTML = '<p class="ny-err">Ошибка: ' + esc(e.message) + '</p>'; });
+  }
+
+  // --- читалка ---
+  function openChapter(ch, chs, mg) {
+    show("reader");
+    var box = $("ny-reader");
+    box.innerHTML = '<p class="ny-status">загрузка страниц…</p>';
+    api("/pages", { src: state.src, url: ch.url }).then(function (j) {
+      var base = API.replace(/\/api$/, "");
+      var idx = chs.indexOf(ch);
+      var prev = chs[idx + 1], next = chs[idx - 1];   // chs новые сверху
+      var nav = '<div class="ny-reader-nav">' +
+        (prev ? '<button class="ny-btn" data-go="' + (idx + 1) + '">← предыдущая</button>' : '') +
+        '<button class="ny-btn" id="ny-to-manga">к манге</button>' +
+        (next ? '<button class="ny-btn" data-go="' + (idx - 1) + '">следующая →</button>' : '') + '</div>';
+      box.innerHTML = '<div class="ny-status" style="text-align:center">' + esc(mg.title) + " — " +
+        esc(ch.number != null ? "глава " + ch.number : ch.title) + " · страниц: " + j.pages.length + '</div>' +
+        nav + '<div class="ny-reader">' +
+        j.pages.map(function (p) {
+          return '<img loading="lazy" referrerpolicy="no-referrer" src="' + esc(base + p.src) + '" alt="стр. ' + (p.i + 1) + '">';
+        }).join("") + '</div>' + nav;
+      box.querySelectorAll("[data-go]").forEach(function (b) {
+        b.addEventListener("click", function () { openChapter(chs[+b.getAttribute("data-go")], chs, mg); });
+      });
+      box.querySelectorAll("#ny-to-manga").forEach(function (b) {
+        b.addEventListener("click", function () { openManga(mg); });
+      });
+    }).catch(function (e) { box.innerHTML = '<p class="ny-err">Ошибка: ' + esc(e.message) + '</p>'; });
+  }
+
+  loadSources();
+})();
+</script>
+</body>
+</html>

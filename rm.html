@@ -1,0 +1,490 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;600;700&family=Russo+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css"><link rel="stylesheet" href="reader.css"><title>Читалка · MangALL</title>
+<style>
+.rmform{display:flex;gap:8px;padding:24px 16px}.rmform[hidden],.nav[hidden]{display:none}
+.rmform input{flex:1;min-width:0;padding:10px 12px;background:var(--s2);border:1px solid var(--line);color:var(--fg);font:inherit}
+.rmform button{padding:10px 16px;border:0;background:var(--acc);color:#fff;font:inherit;font-weight:600;cursor:pointer}
+.rmmsg{padding:24px 16px;text-align:center;color:var(--mut,#888)}
+.ttl{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.cnav[hidden],.chbtn[hidden]{display:none}
+.ctog>span{max-width:min(46vw,360px);overflow:hidden;text-overflow:ellipsis}
+.chbtn.off{opacity:.35;pointer-events:none}
+.chbtn .i-down{transform:none}
+.nav a{display:inline-flex;align-items:center;gap:6px}
+.nav a.off{visibility:hidden}
+.nav .mid{color:var(--mut,#888);font-size:14px}
+@media (max-width:600px){.ttl{display:none}}
+/* seimanga: страница сайта во фрейме, видна только картинка (x=10, y=272) */
+.seibox{position:relative;overflow:hidden;width:100%;background:var(--line);transition:height .15s}
+.seistage{position:absolute;left:0;top:0;transform-origin:0 0}
+.seif{position:absolute;left:0;top:0;height:4500px;border:0;pointer-events:none}
+.seiload{position:absolute;left:50%;top:16px;transform:translateX(-50%);z-index:3;padding:6px 12px;background:var(--card);
+  border:1px solid var(--line);font-size:13px;pointer-events:none}
+.seihit{position:absolute;inset:0;z-index:2;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.seipg{position:absolute;right:8px;bottom:8px;z-index:3;padding:3px 8px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;pointer-events:none}
+/* перевод глав MangaDex в браузере (tr/translate.js): белые пузыри с русским текстом поверх картинки */
+.trl{position:absolute;inset:0;pointer-events:none}body.trorig .trl{display:none}
+.trl .bub{position:absolute;display:flex;align-items:center;justify-content:center;text-align:center;color:#111;
+  background:rgba(255,255,255,.8);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);text-shadow:0 0 3px #fff,0 0 2px #fff;
+  box-shadow:0 0 0 1px rgba(0,0,0,.06);
+  border-radius:10px;padding:2px;box-sizing:border-box;line-height:1.12;font-family:"Comic Sans MS","Chalkboard SE",system-ui,sans-serif;
+  font-weight:600;overflow:hidden;pointer-events:auto}
+.trl .bub span{display:block;max-width:100%;overflow-wrap:break-word;hyphens:auto;-webkit-hyphens:auto}
+#trbtn[hidden],#trst[hidden]{display:none}#trbtn.on>span{background:var(--acc);color:#fff}
+#trst{font-size:12px;color:var(--mut,#888);white-space:nowrap}
+</style></head><body>
+<header class="rnav"><div class="dots" aria-hidden="true"></div>
+<a class="ib" id="back" href="./" title="На главную"><span><i class="ic i-back"></i></span></a>
+<div class="cnav" id="cnav" hidden><button class="ctog" id="ctog" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Список глав"><span id="ctxt">Глава<i class="ic i-down"></i></span></button>
+<div class="cmenu"><div class="mdots" aria-hidden="true"></div><div class="clist" id="clist"></div></div></div>
+<div class="rright">
+<span id="trst" hidden></span>
+<button class="ib" id="trbtn" type="button" hidden title="Перевести главу на русский прямо в браузере"><span><span class="lbl">Перевести</span></span></button>
+</div>
+</header>
+<main>
+<form class="rmform" id="form"><input id="u" placeholder="Ссылка на главу: readmanga, senkuro, MangaLib, seimanga, MangaDex…" autocomplete="off"><button>Открыть</button></form>
+<div id="pages"></div>
+<div class="rmmsg" id="msg" hidden></div>
+<div class="nav" id="nav" hidden><a id="prev" href="#">← Предыдущая</a><span class="mid" id="nmid"></span><a id="next" href="#">Следующая →</a></div>
+</main>
+<script src="tr/translate.js"></script>
+<script>
+// на localhost главы, MangaDex и поиск — с Worker mangall-relay (без карты и без включённого компьютера);
+// /title, каталог и остальное — по-прежнему локальный relay
+const WORKER = 'https://mangall-relay.nake000071.workers.dev';
+const RELAY_CH = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? WORKER : null;
+const RELAY = (location.hostname === 'localhost' || location.hostname === '127.0.0.1' ? 'http://localhost:3000' : /^(192\.168|10)\./.test(location.hostname) ? location.origin + '/relay' : location.origin + '/api');   // localhost — relay на компьютере; домашняя сеть — через serve.py (/relay/); Cloudflare Pages — облачный API (/api/)
+// с какой манги пришли (title.html добавляет &t=id) — кнопка «назад» ведёт на её страницу
+const FROM_T = /^-?\d+$/.test(new URLSearchParams(location.search).get('t') || '') ? new URLSearchParams(location.search).get('t') : '';
+const toU = u => '?u=' + encodeURIComponent(u) + (FROM_T ? '&t=' + FROM_T : '');
+if (FROM_T) { const b = document.getElementById('back'); b.href = 'title.html?id=' + FROM_T; b.title = 'К странице манги'; }
+const $ = id => document.getElementById(id);
+const say = t => { $('msg').hidden = !t; $('msg').textContent = t || ''; };
+
+function go(u) { location.search = toU(u); }
+
+// 18+ на seimanga: сайт пускает к главе с ?mtr=true (подтверждение возраста). Подтверждает сам
+// читатель кнопкой «Мне есть 18» — запоминаем в браузере и дальше добавляем к ссылкам seimanga.
+const AGE_KEY = 'mangall-18';
+const ageOk = () => { try { return localStorage.getItem(AGE_KEY) === '1'; } catch (_) { return false; } };
+function withMtr(url) {
+  if (!/seimanga/i.test(url) || /[?&]mtr=/.test(url)) return url;
+  const i = url.indexOf('#'), b = i < 0 ? url : url.slice(0, i), h = i < 0 ? '' : url.slice(i);
+  return b + (b.includes('?') ? '&' : '?') + 'mtr=true' + h;
+}
+
+// --- seimanga: их CDN отдаёт картинки только своей странице, поэтому показываем саму страницу
+// сайта во фрейме и обрезаем всё, кроме картинки. Не зависит от настроек сайта: фрейм высотой 4500
+// (сайт не прокручивается), картинка в x=10, y=272 (замерено 2026-11-09). Ширина фрейма = ширина
+// страницы + 20 — тогда в натуральную величину и «по ширине» картинка одного размера; если сайт
+// ужмёт широкий разворот, он останется целым (меньше и по центру), но не обрежется.
+// Страница — адрес #page=N (с нуля); смену #page на открытой странице сайт не замечает, поэтому
+// на каждую страницу новый фрейм, а следующая грузится заранее в фоне.
+const SEI_X = 10, SEI_Y = 272, SEI_WAIT = 1200, SEI_PRIMED = 'mangall-sei-real';
+const SEI_AHEAD = 3, SEI_BEHIND = 1;   // сколько страниц держать загруженными вперёд и назад
+// Масштаб по умолчанию сайт выбирает сам и запоминает: в окне ниже 1100 px — «real» (натуральная
+// величина), в высоком — «full» (ужимает широкие развороты). Поэтому при первом открытии грузим
+// главу один раз в невидимом низком фрейме — сайт сам запомнит «real», и дальше всё совпадает.
+function seiPrime(url) {
+  try { if (localStorage.getItem(SEI_PRIMED) === '1') return Promise.resolve(); } catch (_) {}
+  return new Promise(res => {
+    const f = document.createElement('iframe');
+    f.style.cssText = 'position:absolute;left:-9999px;top:0;width:1100px;height:900px;border:0;visibility:hidden';
+    f.setAttribute('aria-hidden', 'true'); f.tabIndex = -1;
+    const done = () => { try { localStorage.setItem(SEI_PRIMED, '1'); } catch (_) {} f.remove(); res(); };
+    f.onload = () => setTimeout(done, 1500);
+    setTimeout(done, 20000);
+    f.src = url;
+    document.body.appendChild(f);
+  });
+}
+let SEI = null;
+function seiReader(d, u) {
+  const base = u.replace(/#.*$/, '');
+  const h = (u.match(/#page=(\w+)/) || [])[1];
+  const last = d.images.length - 1;
+  let n = h === 'last' ? last : Math.min(Math.max(+h || 0, 0), last);
+  const box = document.createElement('div'); box.className = 'seibox';
+  box.innerHTML = '<div class="seistage"></div><div class="seihit" title="Клик слева — назад, справа — дальше"></div>' +
+    '<div class="seiload" hidden>Загружаю страницу…</div><div class="seipg"></div>';
+  $('pages').appendChild(box);
+  const stage = box.querySelector('.seistage'), load = box.querySelector('.seiload'), pgno = box.querySelector('.seipg');
+  const frames = new Map();   // номер страницы → фрейм (текущий и заранее загруженные соседние)
+  let shown = null;
+  function frame(i) {
+    if (frames.has(i)) return frames.get(i);
+    const f = document.createElement('iframe');
+    f.className = 'seif'; f.tabIndex = -1; f.setAttribute('aria-hidden', 'true');
+    f.style.visibility = 'hidden';
+    f.style.width = ((d.images[i].w || 1280) + 2 * SEI_X) + 'px';
+    f.ready = new Promise(res => { f.onload = () => setTimeout(res, SEI_WAIT); setTimeout(res, 20000); });
+    f.src = base + '#page=' + i;
+    stage.appendChild(f); frames.set(i, f);
+    return f;
+  }
+  function layout() {
+    const im = d.images[n] || d.images[0];
+    const w = im.w || 1280, k = box.clientWidth / w;
+    box.style.height = Math.round(w * (im.h / im.w) * k) + 'px';
+    stage.style.transform = `scale(${k}) translate(${-SEI_X}px, ${-SEI_Y}px)`;
+    pgno.textContent = (n + 1) + ' / ' + d.images.length;
+  }
+  async function show(i) {
+    n = i; layout();
+    const f = frame(i);
+    load.hidden = false;
+    await f.ready;
+    if (n !== i) return;                       // пока грузилось, пролистали дальше
+    load.hidden = true;
+    f.style.visibility = 'visible';
+    if (shown && shown !== f) shown.style.visibility = 'hidden';
+    shown = f;
+    for (const [k, fr] of frames) if (k < i - SEI_BEHIND || k > i + SEI_AHEAD) { fr.remove(); frames.delete(k); }
+    preload(i);
+    history.replaceState(null, '', toU(base + '#page=' + i));
+  }
+  // соседние страницы грузим по одной, по очереди: сначала следующая, потом дальше и одна назад
+  let preloading = false;
+  async function preload(i) {
+    if (preloading) return; preloading = true;
+    try {
+      const order = [];
+      for (let k = 1; k <= SEI_AHEAD; k++) order.push(i + k);
+      for (let k = 1; k <= SEI_BEHIND; k++) order.push(i - k);
+      for (const k of order) {
+        if (k < 0 || k > last || n !== i) continue;
+        await frame(k).ready;
+      }
+    } finally { preloading = false; if (n !== i) preload(n); }
+  }
+  function step(dir) {
+    const i = n + dir;
+    if (i < 0) { if (NAV.prev) go(NAV.prev.replace(/#.*$/, '') + '#page=last'); return; }
+    if (i > last) { if (NAV.next) go(NAV.next); return; }
+    show(i); window.scrollTo(0, 0);
+  }
+  box.querySelector('.seihit').onclick = ev => {
+    const r = box.getBoundingClientRect();
+    step(ev.clientX - r.left < r.width / 3 ? -1 : 1);
+  };
+  addEventListener('resize', layout);
+  SEI = { step };
+  load.hidden = false;
+  seiPrime(base).then(() => show(n));
+}
+
+// --- листание глав: список в шапке, кнопки ← → в шапке и внизу, стрелки на клавиатуре ---
+const same = (a, b) => a && b && a.replace(/[?#].*$/, '').replace(/\/$/, '') === b.replace(/[?#].*$/, '').replace(/\/$/, '');
+let NAV = { prev: null, next: null };
+function setupNav(d, u) {
+  const list = d.chapters || [];              // от новых к старым
+  const i = list.findIndex(c => same(c.url, u));
+  // соседи: из списка глав, если он есть, иначе — что дал сайт
+  const prev = i >= 0 ? (list[i + 1] || {}).url || null : d.prev;
+  const next = i >= 0 ? (list[i - 1] || {}).url || null : d.next;
+  NAV = { prev, next };
+  const bind = (el, link) => { el.hidden = false; el.classList.toggle('off', !link); el.href = link ? toU(link) : '#'; };
+  bind($('prev'), prev); bind($('next'), next);
+  $('nav').hidden = false;
+  const cur = i >= 0 ? list[i].title : (d.chapter ? 'Глава ' + d.chapter : 'Глава');
+  $('nmid').textContent = i >= 0 ? `${list.length - i} из ${list.length}` : '';
+  if (list.length) {
+    $('cnav').hidden = false;
+    $('ctxt').firstChild.textContent = cur;
+    $('clist').innerHTML = '';
+    list.forEach((c, k) => {
+      const a = document.createElement('a');
+      a.href = toU(c.url);
+      if (k === i) a.className = 'cur';
+      const sp = document.createElement('span'); sp.textContent = c.title; a.appendChild(sp);
+      $('clist').appendChild(a);
+    });
+  }
+}
+$('ctog').onclick = ev => {
+  ev.stopPropagation();
+  const open = $('cnav').classList.toggle('open'); $('ctog').setAttribute('aria-expanded', open);
+  if (open) { const c = $('clist').querySelector('.cur'); if (c) c.scrollIntoView({ block: 'center' }); }
+};
+document.addEventListener('click', ev => { if (!$('cnav').contains(ev.target)) { $('cnav').classList.remove('open'); $('ctog').setAttribute('aria-expanded', false); } });
+document.addEventListener('keydown', ev => {
+  if (ev.target.closest('input, textarea') || ev.altKey || ev.ctrlKey || ev.metaKey) return;
+  if (ev.key === 'Escape') { $('cnav').classList.remove('open'); return; }
+  if (SEI && (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight')) { ev.preventDefault(); SEI.step(ev.key === 'ArrowLeft' ? -1 : 1); return; }
+  if (ev.key === 'ArrowLeft' && NAV.prev) go(NAV.prev);
+  if (ev.key === 'ArrowRight' && NAV.next) go(NAV.next);
+});
+// шапка прячется при прокрутке вниз и возвращается при прокрутке вверх (как в обычной читалке)
+let lastY = scrollY;
+addEventListener('scroll', () => {
+  if ($('cnav').classList.contains('open')) return;
+  const y = scrollY, end = innerHeight + y >= document.body.scrollHeight - 40;
+  if (y < 80 || end || y < lastY - 30) document.body.classList.remove('hdr-off');
+  else if (y > lastY + 30) document.body.classList.add('hdr-off');
+  if (Math.abs(y - lastY) > 30) lastY = y;
+}, { passive: true });
+
+// --- MangaLib: API сайта (api.cdnlibs.org) отвечает браузеру, но не relay — поэтому всё здесь.
+// Картинки на открытых серверах сайта: основной из списка сайта, при ошибке — запасной.
+const ML_API = 'https://api.cdnlibs.org/api';
+const isML = u => /^(https?:\/\/)?([a-z0-9-]+\.)*mangalib\.me\//i.test(u);
+async function mlGet(path) {
+  const r = await fetch(ML_API + path, { headers: { 'Site-Id': '1' } });
+  if (!r.ok) throw new Error('MangaLib ' + r.status);
+  return (await r.json()).data;
+}
+let mlServers = null;
+async function mlImageServers() {
+  if (!mlServers) {
+    const all = ((await mlGet('/constants?fields[]=imageServers')) || {}).imageServers || [];
+    const s1 = all.filter(x => (x.site_ids || []).includes(1) && x.url);
+    const by = id => (s1.find(x => x.id === id) || {}).url;
+    mlServers = [by('main'), by('compress'), by('secondary')].filter(Boolean);
+    if (!mlServers.length) mlServers = ['https://img2.imglib.info', 'https://img3.cdnlibs.org'];
+  }
+  return mlServers;
+}
+const mlUrl = (slug, v, c) => `https://mangalib.me/ru/${slug}/read/v${v}/c${c}`;
+// ссылка вида mangalib.me/ru/<id--slug>[/read/v1/c1] или mangalib.me/ru/manga/<id--slug>
+function mlParse(u) {
+  const p = new URL(u).pathname;
+  const m = p.match(/\/(?:ru\/)?(?:manga\/)?(\d+--[^/]+)(?:\/read\/v([^/]+)\/c([^/?#]+))?/);
+  if (!m) throw new Error('нужна ссылка на мангу или главу mangalib.me');
+  return { slug: m[1], v: m[2], c: m[3] };
+}
+async function mlChapter(u) {
+  const { slug, v, c } = mlParse(u);
+  const [info, list, servers] = await Promise.all([
+    mlGet(`/manga/${slug}?fields[]=eng_name&fields[]=otherNames`),
+    mlGet(`/manga/${slug}/chapters`),
+    mlImageServers(),
+  ]);
+  if (!list || !list.length) throw new Error('у этой манги на MangaLib нет глав');
+  let i = v ? list.findIndex(x => String(x.volume) === String(v) && String(x.number) === String(c)) : 0;
+  if (i < 0) throw new Error('глава не найдена');
+  const ch = list[i];
+  const br = (ch.branches || [])[0] || {};
+  const q = `number=${encodeURIComponent(ch.number)}&volume=${encodeURIComponent(ch.volume)}` + (br.branch_id ? `&branch_id=${br.branch_id}` : '');
+  const data = await mlGet(`/manga/${slug}/chapter?${q}`);
+  const images = (data.pages || []).map(p => ({ url: servers[0] + p.url, alt: servers.slice(1).map(s => s + p.url), w: p.width, h: p.height }));
+  const cu = x => mlUrl(slug, x.volume, x.number);
+  return {
+    manga: info.rus_name || info.eng_name || info.name, chapter: String(ch.number), images, native: 'mangalib.me',
+    url: cu(ch),
+    chapters: list.map(x => ({ url: cu(x), title: `${x.volume} - ${x.number}${x.name ? ' ' + x.name : ''}` })).reverse(),
+    prev: i > 0 ? cu(list[i - 1]) : null,
+    next: i < list.length - 1 ? cu(list[i + 1]) : null,
+  };
+}
+// поиск на MangaLib: точное совпадение названия (русского, английского, оригинального)
+async function mlFind(q, alt) {
+  const norm = t => String(t || '').toLowerCase().replace(/ё/g, 'е').replace(/[^a-zа-я0-9]+/g, '');
+  const want = [q, alt].map(norm).filter(Boolean);
+  for (const term of [q, alt].filter(Boolean)) {
+    const res = (await mlGet('/manga?q=' + encodeURIComponent(term) + '&site_id[]=1')) || [];
+    const names = x => [x.rus_name, x.eng_name, x.name, ...(x.otherNames || [])].map(norm).filter(Boolean);
+    const hit = res.find(x => names(x).some(n => want.includes(n))) ||
+      (() => { const pre = res.filter(x => names(x).some(n => want.some(w => w.length >= 10 && n.startsWith(w)))); return pre.length === 1 ? pre[0] : null; })();
+    if (hit) return `https://mangalib.me/ru/${hit.slug_url}`;
+  }
+  return null;
+}
+
+// --- readmanga / seimanga без relay: глава открывается в скрытом фрейме прямо в браузере читателя,
+// юзерскрипт mangall-bridge.user.js на их сайте отдаёт сюда картинки и список глав (postMessage).
+const isRMfam = u => /^(https?:\/\/)?([a-z0-9-]+\.)*(readmanga\.(me|club)|mintmanga\.me|selfmanga\.me|seimanga\.(me|ru)|zazaza\.me)\//i.test(u);
+// seimanga/zazaza пускают во фрейм; readmanga/mintmanga/selfmanga — нет, им маленькое окно
+// (открыть окно браузер даёт только по клику, поэтому для них — кнопка)
+const frameOk = u => /seimanga|zazaza/i.test(u);
+function bridge(u, ms = 30000) {
+  return new Promise((res, rej) => {
+    const id = Math.random().toString(36).slice(2);
+    let f = null, w = null;
+    if (frameOk(u)) {
+      f = document.createElement('iframe');
+      f.name = 'mangall-bridge-' + id;
+      f.style.cssText = 'position:absolute;left:-9999px;top:0;width:1100px;height:900px;border:0;visibility:hidden';
+      f.setAttribute('aria-hidden', 'true'); f.tabIndex = -1;
+    } else {
+      w = window.open(u, 'mangall-bridge-' + id, 'popup,width=420,height=300');
+      if (!w) return rej(new Error('браузер не дал открыть окно — разреши всплывающие окна для этой страницы'));
+    }
+    const end = () => { removeEventListener('message', on); clearTimeout(timer); if (f) f.remove(); try { if (w && !w.closed) w.close(); } catch (_) {} };
+    const on = ev => {
+      const m = ev.data;
+      if (!m || m.mangallBridge !== id || !isRMfam(ev.origin + '/')) return;
+      end();
+      m.error ? rej(new Error(m.error)) : res(m);
+    };
+    const timer = setTimeout(() => { end(); rej(new Error('NOBRIDGE')); }, ms);
+    addEventListener('message', on);
+    if (f) { f.src = u; document.body.appendChild(f); }
+  });
+}
+async function bridgeChapter(u) {
+  const m = await bridge(u);
+  if (m.first) return { redirect: m.first };         // дали ссылку на мангу — открываем первую главу
+  return m.data;
+}
+function clickToBridge() {
+  return new Promise(res => {
+    $('msg').hidden = false;
+    $('msg').innerHTML = 'readmanga сейчас не отвечает relay — можно открыть главу через твой браузер ' +
+      '(на секунду откроется маленькое окно и само закроется).<br><br><button type="button" class="btn go">Открыть через браузер</button>';
+    $('msg').querySelector('button').onclick = () => res();
+  });
+}
+function noBridge() {
+  $('form').hidden = false;
+  $('msg').hidden = false;
+  $('msg').innerHTML = 'readmanga сейчас не отвечает relay, а юзерскрипт-мост не ответил.<br><br>' +
+    'Поставь в Tampermonkey или Violentmonkey: <a href="mangall-bridge.user.js"><b>mangall-bridge.user.js</b></a> ' +
+    '(откроется окно установки) — и обнови страницу.<br><small>Ещё причина: сайт не открылся и в самом браузере.</small>';
+}
+
+// --- «Перевести» (только главы MangaDex): OCR + перевод в браузере, страницы — по мере листания ---
+const TR_ON = 'mangall-tr-on';
+function setupTranslate() {
+  if (!window.MTR) return;
+  const btn = $('trbtn'), st = $('trst'), lbl = btn.querySelector('.lbl');
+  const pgs = [...document.querySelectorAll('#pages .pg')];
+  const done = new Set(), queued = new Set();
+  let on = false, busy = false, err = '';
+  btn.hidden = false;
+  const status = () => {
+    st.hidden = !on;
+    st.textContent = err ? 'Ошибка перевода' : done.size === pgs.length ? 'Переведено' : `Перевод: ${done.size} из ${pgs.length}` + (MTR.isolated() ? '' : ' (1 поток)');
+    st.title = err;
+  };
+  async function pump() {
+    if (busy || !on) return;
+    const i = [...queued].sort((a, b) => a - b)[0];
+    if (i === undefined) return;
+    busy = true; queued.delete(i);
+    try {
+      const d = await MTR.page(pgs[i].querySelector('img').src);
+      MTR.draw(pgs[i], d); done.add(i); err = '';
+    } catch (e) { err = e.message; console.error('перевод', e); }
+    busy = false; status(); pump();
+  }
+  // страницы у экрана и чуть ниже — в очередь (сначала верхние)
+  const io = new IntersectionObserver(es => es.forEach(e => {
+    const i = pgs.indexOf(e.target);
+    if (e.isIntersecting && !done.has(i)) { queued.add(i); pump(); }
+  }), { rootMargin: '0px 0px 150% 0px' });
+  function start() {
+    on = true; btn.classList.add('on'); lbl.textContent = 'Оригинал'; document.body.classList.remove('trorig');
+    try { localStorage.setItem(TR_ON, '1'); } catch (_) {}
+    pgs.forEach(p => io.observe(p)); status();
+  }
+  btn.onclick = () => {
+    if (!on) return start();
+    const orig = document.body.classList.toggle('trorig');      // перевод уже идёт — кнопка переключает вид
+    lbl.textContent = orig ? 'Перевод' : 'Оригинал';
+  };
+  // включал перевод на прошлой главе — включаем сразу
+  try { if (localStorage.getItem(TR_ON) === '1') start(); } catch (_) {}
+}
+
+async function load(u) {
+  if (ageOk() && withMtr(u) !== u) return location.replace(toU(withMtr(u)));
+  $('u').value = u;
+  $('form').hidden = true;
+  say('Загружаю главу…');
+  let d;
+  try {
+    if (isML(u)) d = await mlChapter(u);
+    else {
+      const ep = /mangadex\.org\//i.test(u) ? '/md' : '/chapter';
+      try {
+        const r = await fetch((RELAY_CH || RELAY) + ep + '?u=' + encodeURIComponent(u));
+        d = await r.json();
+        // Worker пока не знает seimanga/senkuro — тогда берём локальный relay
+        if (d.error && RELAY_CH) d = await (await fetch(RELAY + ep + '?u=' + encodeURIComponent(u))).json();
+        if (d.error) throw new Error(d.error);
+      } catch (e) {
+        if (!isRMfam(u)) throw e;
+        if (!frameOk(u)) await clickToBridge();   // окно — только по клику
+        say('Загружаю главу через браузер…');
+        d = await bridgeChapter(u);            // relay не смог — пробуем через юзерскрипт
+      }
+    }
+  } catch (e) {
+    if (e.message === 'NOBRIDGE') return noBridge();
+    $('form').hidden = false;
+    return say('Не получилось: ' + e.message + (isML(u) ? '.' : '. Запущен ли relay (node relay.js)?'));
+  }
+  if (d.redirect) return location.replace(toU(ageOk() ? withMtr(d.redirect) : d.redirect));
+  if (d.adult) {
+    say('');
+    $('msg').hidden = false;
+    if (/seimanga/i.test(u)) {
+      $('msg').innerHTML = 'Эта глава 18+: seimanga просит подтвердить возраст.<br><br>' +
+        '<button type="button" class="btn go">Мне есть 18 — открыть</button>' +
+        '<br><br><small>Запомню в этом браузере и дальше спрашивать не буду.</small>';
+      $('msg').querySelector('button').onclick = () => { try { localStorage.setItem(AGE_KEY, '1'); } catch (_) {} go(withMtr(u)); };
+      return;
+    }
+    $('msg').innerHTML = 'Эта глава 18+: сайт просит подтвердить возраст. <a target="_blank" rel="noopener"></a>';
+    const a = $('msg').querySelector('a'); a.href = u; a.textContent = 'Открыть на сайте';
+    return;
+  }
+  if (!d.images.length) { $('form').hidden = false; return say('В главе не нашлось картинок (может, нужна авторизация — READMANGA_COOKIE).'); }
+  say('');
+  const isMD = /mangadex\.org\//i.test(u);
+  const name = (d.manga ? d.manga + ' — ' : '') + (d.chapter ? 'глава ' + d.chapter : '');
+  document.title = (name || 'Читалка') + ' · MangALL';
+  $('pages').innerHTML = '';
+  if (/seimanga/.test(d.native || '')) { setupNav(d, u); seiReader(d, u); return; }
+  d.images.forEach((im, i) => {
+    const div = document.createElement('div');
+    div.className = 'pg';
+    if (im.w && im.h) div.style.aspectRatio = im.w + '/' + im.h;
+    const img = document.createElement('img');
+    // readmanga: читалка сайта берёт картинки по пути без хвоста ?t=…&h=… — так же и тут
+    const src = isMD ? im.url : im.url.replace(/[?#].*$/, '');
+    img.src = src;
+    img.loading = i < 2 ? 'eager' : 'lazy';
+    img.alt = 'Страница ' + (i + 1);
+    // не загрузилась — ещё пара попыток
+    let tries = 0;
+    const alts = (im.alt || []).slice();   // MangaLib: запасные серверы картинок
+    img.onerror = () => { if (alts.length) { img.src = alts.shift(); return; } if (tries++ < 3) setTimeout(() => { img.removeAttribute('src'); img.src = src; }, 1500 * tries); };
+    div.appendChild(img);
+    $('pages').appendChild(div);
+  });
+  if (isMD) setupTranslate();
+  if (d.url && !same(d.url, u)) history.replaceState(null, '', toU(d.url));
+  setupNav(d, d.url || u);   // d.url — адрес самой главы, если открывали ссылку на мангу
+  scrollTo(0, 0);
+}
+
+$('form').onsubmit = e => { e.preventDefault(); const v = $('u').value.trim(); if (v) go(v); };
+const qs = new URLSearchParams(location.search);
+const u = qs.get('u');
+if (u) load(u);
+else if (qs.get('find')) find(qs.get('find'), qs.get('alt') || '', qs.get('al') || '', qs.get('y') || '');
+
+// ?find=<название>&alt=<англ. название> — ищем мангу на readmanga и открываем первую главу
+async function find(q, alt, al, y) {
+  $('form').hidden = true;
+  document.title = q + ' · MangALL';
+  say('Ищу «' + q + '» на readmanga…');
+  try {
+    const r = await fetch((RELAY_CH || RELAY) + '/find?q=' + encodeURIComponent(q) + '&alt=' + encodeURIComponent(alt) + (al ? '&al=' + encodeURIComponent(al) : '') + (y ? '&y=' + encodeURIComponent(y) : ''));
+    const d = await r.json();
+    let url = d.url;
+    if (!url) { say('Ищу «' + q + '» на MangaLib…'); url = await mlFind(q, alt).catch(() => null); }
+    if (!url) throw new Error(d.error || 'не нашлось');
+    location.replace(toU(ageOk() ? withMtr(url) : url));
+  } catch (e) {
+    $('form').hidden = false;
+    $('u').value = '';
+    say('«' + q + '»: не нашлось на readmanga, senkuro, seimanga и MangaLib. Можно вставить ссылку на главу вручную.');
+  }
+}
+</script>
+</body></html>

@@ -1,0 +1,2162 @@
+/* MangALL — чистая вёрстка с нуля. Тёмно-красная (Persona 5) палитра,
+   острые срезанные углы, диагональные разделители, Ben-Day dots в углах
+   шапки и подвала. Тема — через CSS-переменные на :root, светлая — [data-theme=light]. */
+
+:root {
+  --bg: #0e0e10;
+  --surface: #17171a;
+  --surface2: #1f1f23;
+  --text: #f2f2f3;
+  --text-dim: #9a9aa0;
+  --accent: #a91e22;
+  --accent-bright: #d42a2f;
+  --border: #2a2a2e;
+  --shadow: rgba(0,0,0,.5);
+
+  /* Единая шкала отступов — раньше margin/padding/gap набегали как
+     попало (2, 6, 7, 10, 13, 14, 18, 22, 26...px), отсюда ощущение «где-то
+     много, где-то мало». Everything below snaps на ближайший шаг. Не
+     трогает декоративную геометрию (толщину «рамки» в приёме clip-path,
+     срез уголков, размеры иконок/обложек) — это не ритм, а форма. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+}
+:root[data-theme="light"] {
+  --bg: #f5f3f0;
+  --surface: #ffffff;
+  --surface2: #ece9e4;
+  --text: #18171a;
+  --text-dim: #6b6a70;
+  --accent: #a91e22;
+  --accent-bright: #8a1519;
+  --border: #e1ddd6;
+  --shadow: rgba(0,0,0,.12);
+}
+
+* { box-sizing: border-box; }
+/* Каждая <button> на сайте уже стилизована своим классом (фон/рамка/
+   размер задаём сами везде) — без этого сброса iOS Safari подмешивает
+   свой нативный вид кнопки поверх (появляется системная синяя заливка и
+   свой размер/паддинг, которые перебивают clip-path — так вылезла синяя
+   circle-кнопка аккаунта в шапке на телефоне, при том что на десктопе
+   выглядело нормально: там appearance:auto у большинства браузеров и так
+   близок к none для non-native-looking кнопок, iOS Safari — исключение). */
+button { appearance: none; -webkit-appearance: none; background: none; border: none; font: inherit; color: inherit; }
+/* smooth — «Каталог» в меню аккаунта теперь якорь на секцию этой же
+   страницы (см. index.html), не переход на отдельный /catalog — без
+   этого прыгало бы туда мгновенно, а не плавно. */
+html { background: var(--bg); scroll-behavior: smooth; }
+body {
+  margin: 0; padding: 0;
+  /* Фон вацапа, только комиксный — тайл со звёздами-разрывами, пустым
+     пузырём и кучкой точек (см. comic-pattern.svg), почти невидимый
+     (яркость зашита в самом файле), поверх ровного цвета темы. Обычный
+     background-image на body — скроллится вместе со страницей, как и
+     положено обоям, а не «прилипает» к экрану. */
+  background-color: var(--bg);
+  background-image: url(icons/comic-pattern.svg);
+  background-repeat: repeat;
+  background-size: 360px 360px;
+  color: var(--text);
+  font-family: 'Golos Text', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; text-decoration: none; }
+img { max-width: 100%; display: block; }
+/* Клавиатурная навигация — свой акцентный ring вместо браузерного синего,
+   чтобы не выбивался из палитры; по мыши/тапу не показывается. */
+:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 2px; }
+
+.logo {
+  font-family: 'Unbounded', sans-serif;
+  font-weight: 900;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.logo::first-letter { color: var(--accent); }
+
+/* ── Nav ── */
+.nav {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  /* Тот же цвет, что у .footer (var(--surface)) — было полупрозрачное
+     размытие (color-mix + backdrop-filter), убрал: с непрозрачным фоном
+     блюр под ним уже нечего показывать. */
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  /* Без overflow:hidden — он обрезал .account-menu (она специально
+     торчит ниже .nav). Точки в углу и так гаснут по маске задолго до
+     нижнего края своего 160px-бокса, так что без клипа их не видно. */
+}
+/* scroll-margin-top у #catalog-page (см. ниже) — .nav прилипает к верху
+   (position:sticky), и без этого прыжок к разделу (Enter в поиске шапки,
+   см. goToCatalog в common.js, а на переходе с другой страницы — обычный
+   якорь #catalog-page) останавливался ровно там, где заголовок «Каталог»
+   уезжает ПОД шапку — не видно, куда вообще проскроллило. scroll-margin
+   работает и для scrollIntoView(), и для обычного якоря в адресе, одним
+   правилом на оба случая. */
+.nav .footer-dots {
+  /* 64px — умещается по высоте даже в самый узкий вариант шапки (12px
+     паддинг + ~40px контента), .nav больше не обрезает overflow:hidden
+     (см. комментарий у .nav), так что за её пределы теперь отвечает
+     только собственный размер этого блока. */
+  top: 0; right: 0; width: 64px; height: 64px;
+  -webkit-mask-image: radial-gradient(circle at 100% 0%, black 0%, transparent 65%);
+          mask-image: radial-gradient(circle at 100% 0%, black 0%, transparent 65%);
+}
+/* Иконки — Lucide SVG как CSS-маска, красится через обычный `color`
+   (в отличие от <img src="*.svg">, где currentColor из страницы не виден). */
+.icon {
+  display: inline-block; width: 18px; height: 18px;
+  background-color: currentColor;
+  -webkit-mask-size: contain; mask-size: contain;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-position: center; mask-position: center;
+  flex-shrink: 0;
+}
+.icon-search { -webkit-mask-image: url(icons/search.svg);        mask-image: url(icons/search.svg); }
+.icon-sun    { -webkit-mask-image: url(icons/sun.svg);           mask-image: url(icons/sun.svg); }
+.icon-moon   { -webkit-mask-image: url(icons/moon.svg);          mask-image: url(icons/moon.svg); }
+.icon-clock  { -webkit-mask-image: url(icons/clock.svg);         mask-image: url(icons/clock.svg); }
+.icon-flame  { -webkit-mask-image: url(icons/flame.svg);         mask-image: url(icons/flame.svg); }
+.icon-star   { -webkit-mask-image: url(icons/star.svg);          mask-image: url(icons/star.svg); }
+.icon-heart  { -webkit-mask-image: url(icons/heart.svg);         mask-image: url(icons/heart.svg); }
+.icon-chevron-right { -webkit-mask-image: url(icons/chevron-right.svg); mask-image: url(icons/chevron-right.svg); }
+.icon-chevron-left  { -webkit-mask-image: url(icons/chevron-left.svg);  mask-image: url(icons/chevron-left.svg); }
+.icon-lock   { -webkit-mask-image: url(icons/lock.svg);   mask-image: url(icons/lock.svg); }
+.icon-tag    { -webkit-mask-image: url(icons/tag.svg);    mask-image: url(icons/tag.svg); }
+.icon-filter { -webkit-mask-image: url(icons/filter.svg); mask-image: url(icons/filter.svg); }
+.icon-unlock { -webkit-mask-image: url(icons/unlock.svg); mask-image: url(icons/unlock.svg); }
+.icon-user   { -webkit-mask-image: url(icons/user.svg);          mask-image: url(icons/user.svg); }
+.icon-log-in { -webkit-mask-image: url(icons/log-in.svg);        mask-image: url(icons/log-in.svg); }
+.icon-trash  { -webkit-mask-image: url(icons/trash.svg);         mask-image: url(icons/trash.svg); }
+.icon-bell   { -webkit-mask-image: url(icons/bell.svg);          mask-image: url(icons/bell.svg); }
+.icon-plus   { -webkit-mask-image: url(icons/plus.svg);          mask-image: url(icons/plus.svg); }
+.icon-eye     { -webkit-mask-image: url(icons/eye.svg);          mask-image: url(icons/eye.svg); }
+.icon-brush   { -webkit-mask-image: url(icons/brush.svg);        mask-image: url(icons/brush.svg); }
+.icon-eraser  { -webkit-mask-image: url(icons/eraser.svg);       mask-image: url(icons/eraser.svg); }
+.icon-type    { -webkit-mask-image: url(icons/type.svg);         mask-image: url(icons/type.svg); }
+.icon-eye-off { -webkit-mask-image: url(icons/eye-off.svg);      mask-image: url(icons/eye-off.svg); }
+.icon-rotate-ccw { -webkit-mask-image: url(icons/rotate-ccw.svg); mask-image: url(icons/rotate-ccw.svg); }
+.icon-pencil { -webkit-mask-image: url(icons/pencil.svg); mask-image: url(icons/pencil.svg); }
+.icon-download { -webkit-mask-image: url(icons/download.svg); mask-image: url(icons/download.svg); }
+
+/* Приём «фон вместо рамки»: обёртка красится в цвет рамки и обрезана
+   полигоном, внутренняя поверхность — на 1px меньше с пропорционально
+   уменьшенным полигоном, иначе на срезе угла нет обводки. Тот же приём —
+   у .account-toggle-frame и .story-circle-frame. Толщина «рамки» (1-3px) —
+   это геометрия приёма, не ритм отступов, шкалу сюда не тащим. */
+/* .nav-search-wrap — позиционный якорь для .nav-search-dropdown ниже.
+   Специально ОТДЕЛЬНЫЙ элемент, а не сам .nav-search-frame: у того
+   свой clip-path (срезанный уголок), а clip-path обрезает ВСЕХ потомков,
+   включая абсолютно спозиционированных — список подсказок оказался бы
+   заранее обрезан по границе рамки, хоть и позиционирован ниже нее (та
+   же ловушка, из-за которой в своё время убрали overflow:hidden у .nav
+   ради .account-menu — тут клипает не .nav, а сама .nav-search-frame,
+   так что решение то же: вынести то, что должно торчать за пределы, в
+   родителя без clip-path/overflow). */
+.nav-search-wrap { position: relative; flex: 1; max-width: 420px; }
+.nav-search-frame {
+  background: var(--border);
+  padding: 1px;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+}
+.nav-search {
+  display: flex; align-items: center; gap: var(--space-2);
+  background: var(--surface2);
+  padding: var(--space-2) var(--space-3);
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 0 100%);
+}
+.nav-search input {
+  flex: 1; background: none; border: none; outline: none;
+  color: var(--text); font-family: 'Golos Text'; font-size: 14px;
+}
+.nav-search input::placeholder { color: var(--text-dim); }
+
+/* ── Живые подсказки при наборе (см. initNavSearch в common.js) —
+   портировано с /search на 8080 (тот же /api/manga/suggest), но как
+   выпадающий список под строкой в шапке, а не отдельная страница. ── */
+.nav-search-dropdown {
+  position: absolute; top: calc(100% + var(--space-2)); left: 0; right: 0;
+  background: var(--surface2); border: 1px solid var(--border);
+  max-height: 70vh; overflow-y: auto; z-index: 250;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.35);
+}
+.nav-search-item {
+  display: block; padding: var(--space-3); cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+.nav-search-item:last-child { border-bottom: none; }
+.nav-search-item:hover, .nav-search-item.active { background: var(--surface); }
+.nav-search-item.active .nav-search-title { color: var(--accent-bright); }
+.nav-search-title {
+  font-size: 14px; font-weight: 700; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.nav-search-alt {
+  font-size: 12px; color: var(--text-dim); margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.nav-search-alt .dot { opacity: .35; margin: 0 5px; }
+.nav-search-dropdown mark { background: rgba(212,42,47,0.28); color: inherit; border-radius: 3px; padding: 0 1px; }
+.nav-search-state { padding: var(--space-4); text-align: center; color: var(--text-dim); font-size: 13px; }
+
+/* ── Меню аккаунта: кнопка та же «фон вместо рамки», что и раньше у
+   переключателя темы, только рядом с ней теперь всплывающая панель
+   (сама тема переехала внутрь первым пунктом). ── */
+/* .nav-account — просто обёртка, без position:relative: контейнером для
+   .account-menu/-arrow нарочно служит .nav (у него уже position:sticky).
+   На узком экране .nav переносится в два ряда (шапка + поиск снизу), и
+   если бы меню отсчитывалось от .nav-account (он остаётся в первом
+   ряду), оно падало бы поверх строки поиска, а не под весь хедер целиком. */
+/* margin-left: auto — у .nav-search-wrap есть свой max-width (420px), и
+   на широком экране она перестаёт расти раньше, чем кончается место в
+   .nav: без этой строки остаток пространства просто повисал бы ПОСЛЕ
+   кнопки аккаунта, а не она сама стояла бы у самого правого края. */
+.nav-account { margin-left: auto; }
+.account-toggle-frame {
+  background: var(--border); border: none; padding: 1px; cursor: pointer;
+  width: 36px; height: 36px;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
+}
+.account-toggle {
+  position: relative;
+  background: var(--surface2);
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 0 100%);
+}
+/* Аватарка вместо иконки-заглушки (см. initAuth() в common.js) — не
+   отдельный кружок сбоку, а прямо в той же самой уже-срезанной рамке
+   кнопки: clip-path у .account-toggle обрезает и содержимое тоже, так
+   что второй clip-path на картинке не нужен — уголок наследуется даром.
+   position:absolute+inset:0 вместо ширины/высоты в процентах — так
+   надёжнее внутри flex-контейнера (у него ещё и align/justify:center
+   для иконки, absolute их просто игнорирует). */
+.account-toggle-avatar {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; background: var(--surface2);
+}
+/* явно — иначе общий "img { display: block }" (см. вверху файла)
+   перебивает UA [hidden], та же история, что и у .account-menu-item
+   выше: без этой строки пустая (без src) картинка всегда видна и
+   перекрывает иконку-человечка под собой (она position:absolute,
+   inset:0 — на весь .account-toggle), даже когда гость не залогинен и
+   JS её вообще не трогал. */
+.account-toggle-avatar[hidden] { display: none; }
+.account-toggle-frame:hover .account-toggle-avatar { filter: brightness(1.08); }
+
+/* Открытие/закрытие — не display:none у [hidden] (из display:none нельзя
+   анимировать), а opacity+scale с задержкой на visibility, чтобы после
+   закрытия панель не осталась кликабельной/фокусируемой поверх контента. */
+.account-menu {
+  position: absolute; top: calc(100% + var(--space-3)); right: 0; z-index: 60;
+  width: 230px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: var(--space-2);
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+  overflow: hidden;
+  transform-origin: top right;
+  opacity: 0; visibility: hidden; transform: scale(.92);
+  transition: opacity .15s ease, transform .15s ease, visibility 0s .15s;
+}
+.nav-account.open .account-menu {
+  opacity: 1; visibility: visible; transform: scale(1);
+  transition: opacity .15s ease, transform .15s ease;
+}
+/* Комиксовые Ben-Day точки в углу панели — тот же приём, что у
+   .footer-dots в шапке/подвале, третье применение того же паттерна. */
+.account-menu-dots {
+  position: absolute; right: 0; bottom: 0; width: 90px; height: 90px;
+  background-image: radial-gradient(circle, var(--accent) 1.4px, transparent 1.6px);
+  background-size: 12px 12px;
+  opacity: .25;
+  -webkit-mask-image: radial-gradient(circle at 100% 100%, black 0%, transparent 65%);
+          mask-image: radial-gradient(circle at 100% 100%, black 0%, transparent 65%);
+  pointer-events: none;
+}
+/* Треугольник-«хвостик» к кнопке — не ровный симметричный пипс, а со
+   скосом (skewX), в тон срезанным углам сайта. Два наложенных
+   border-триугольника: побольше — рамка, поменьше — фон меню поверх. */
+.account-menu-arrow {
+  position: absolute; top: 100%; right: 14px; z-index: 61;
+  width: 16px; height: 9px;
+  transform: skewX(-12deg) translateY(-4px);
+  opacity: 0; visibility: hidden;
+  transition: opacity .15s ease, transform .15s ease, visibility 0s .15s;
+}
+.nav-account.open .account-menu-arrow {
+  transform: skewX(-12deg) translateY(3px);
+  opacity: 1; visibility: visible;
+  transition: opacity .15s ease, transform .15s ease;
+}
+.account-menu-arrow::before, .account-menu-arrow::after {
+  content: ""; position: absolute; top: 0; left: 0;
+  border-left: 8px solid transparent; border-right: 8px solid transparent;
+}
+.account-menu-arrow::before { border-bottom: 9px solid var(--border); }
+.account-menu-arrow::after { top: 1px; left: 1px; border-left-width: 7px; border-right-width: 7px; border-bottom: 8px solid var(--surface); }
+.account-menu-item {
+  width: 100%; display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3); background: none; border: none; cursor: pointer;
+  color: var(--text); font-family: 'Golos Text'; font-size: 14px; text-align: left;
+  transition: background-color .15s, color .15s;
+}
+/* явно — иначе свой display перебивает UA [hidden] (см. .story-lock-frame
+   выше: тот же самый эффект уже случался раньше в этом файле). Без этой
+   строки #login-item/#logout-item, оба с классом .account-menu-item,
+   переключением через .hidden в initAuth() (common.js) не прячутся —
+   оба видны одновременно, независимо от того, залогинен человек или нет. */
+.account-menu-item[hidden] { display: none; }
+.account-menu-item .icon { color: var(--text-dim); transition: color .15s; }
+.account-menu-item:hover { background: var(--surface2); }
+.account-menu-icon { position: relative; width: 18px; height: 18px; flex-shrink: 0; }
+.account-menu-icon .icon { position: absolute; top: 0; left: 0; }
+.account-menu-icon .icon-moon { display: none; }
+:root[data-theme="light"] .account-menu-icon .icon-sun { display: none; }
+:root[data-theme="light"] .account-menu-icon .icon-moon { display: inline-block; }
+.account-menu-divider { height: 1px; background: var(--border); margin: var(--space-2) var(--space-1); }
+/* «Войти» — акцентная строка-CTA, отдельно от нейтральных пунктов ниже. */
+.account-menu-item--cta { color: var(--accent-bright); font-weight: 700; }
+.account-menu-item--cta .icon { color: var(--accent-bright); }
+.account-menu-item--cta:hover { background: var(--accent); color: #fff; }
+.account-menu-item--cta:hover .icon { color: #fff; }
+
+/* Текущий выбранный статус в меню коллекции на странице тайтла (см.
+   web/manga.html/manga.js) — тот же список .account-menu-item, просто с
+   отмеченным активным пунктом. */
+.manga-collection-menu .account-menu-item.active { color: var(--accent-bright); font-weight: 700; }
+.manga-collection-wrap.has-status .catalog-filter-toggle-inner .icon { color: var(--accent-bright); }
+
+/* Строка "залогинен как X" — не кликабельна, просто ник первой строкой
+   меню (появляется вместо гостевого вида, см. initAuth() в common.js).
+   Без аватарки — она уже в самой кнопке-тоггле шапки (см.
+   .account-toggle-avatar), тут второй раз не нужна. #logout-item ниже —
+   обычная .account-menu-item, свою стилистику не переопределяем, она уже
+   подходит и для <button>. */
+.account-menu-user { padding: var(--space-3) var(--space-3) var(--space-2); }
+.account-menu-username {
+  display: block; font-family: 'Unbounded'; font-weight: 700; font-size: 15px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ── Уведомления — по прямой просьбе НЕ отдельным колокольчиком в
+   шапке, а пунктом прямо внутри .account-menu: #notif-toggle — обычный
+   .account-menu-item (см. его стили выше), тут только бейдж-счётчик и
+   разворачивающийся под ним список (см. initNotifications в common.js:
+   клик по пункту не закрывает всё меню, просто прячет/показывает
+   #notif-list). ── */
+.notif-badge {
+  margin-left: auto; flex-shrink: 0;
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+  background: var(--accent); color: #fff;
+  font-family: 'Golos Text'; font-weight: 700; font-size: 11px; line-height: 18px;
+  text-align: center;
+}
+.notif-badge[hidden] { display: none; }
+.notif-inline-list {
+  max-height: 260px; overflow-y: auto;
+  border-top: 1px solid var(--border);
+  margin: var(--space-1) 0;
+}
+.notif-item {
+  display: block; padding: var(--space-2) var(--space-3); text-decoration: none; color: var(--text);
+  border-bottom: 1px solid var(--border);
+  transition: background-color .15s;
+}
+.notif-item:last-child { border-bottom: none; }
+.notif-item:hover { background: var(--surface2); }
+.notif-item.unread { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.notif-item-text { font-size: 13px; line-height: 1.4; font-family: 'Golos Text'; }
+.notif-item-time { margin-top: 3px; font-size: 11px; color: var(--text-dim); }
+.notif-empty { padding: var(--space-4) var(--space-3); text-align: center; color: var(--text-dim); font-size: 13px; }
+
+.grid-loading { padding: var(--space-7) var(--space-5); color: var(--text-dim); font-size: 14px; }
+
+/* ── Sections ── */
+/* Без боковых паддингов на самой секции — только вертикальные. Горизонтальный
+   гутер даёт .section-inset там, где он нужен (заголовок, разворот,
+   пагинация, плашка). У .story-row его нет специально — она должна идти
+   на всю ширину экрана (см. .story-row ниже), как в референсе. */
+.section { --section-pad-x: var(--space-7); padding: var(--space-7) 0 var(--space-5); position: relative; }
+/* Отступ под прилипшую шапку при прыжке сюда (см. .nav выше про
+   scroll-margin-top) — с запасом сверх реальной высоты .nav (~72px на
+   десктопе), чтобы заголовок секции не упирался в шапку впритык, а
+   оставался с небольшим воздухом под ней. */
+#catalog-page { scroll-margin-top: 96px; }
+.section-inset { padding-left: var(--section-pad-x); padding-right: var(--section-pad-x); }
+.section-head {
+  display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-5);
+}
+.section-icon { width: 22px; height: 22px; color: var(--accent); }
+/* Стрелка-ссылка справа в шапке секции (см. #recent выше) — прижата
+   margin-left:auto, как и .nav-account в шапке сайта. */
+.section-head-arrow {
+  margin-left: auto; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px;
+  color: var(--text-dim);
+  transition: color .15s, background-color .15s;
+}
+.section-head-arrow:hover { color: #fff; background: var(--accent); }
+.section-head-arrow .icon { width: 18px; height: 18px; }
+.section h2 {
+  font-family: 'Unbounded'; font-weight: 700; font-size: 20px; margin: 0;
+}
+
+/* Чипс активного текстового запроса каталога (см. applyCatalogQuery в
+   catalog.js) — тот же плоский стиль пилюли, что и у .catalog-card-tag,
+   просто крупнее и с крестиком на сброс. Жёлтый/чёрный — фиксированные
+   цвета, не темовые переменные: чипс должен выделяться одинаково что в
+   тёмной, что в светлой теме, не сливаясь с обычными --surface2-пилюлями
+   вокруг него. */
+.catalog-query-chip {
+  display: flex; align-items: center; gap: var(--space-2);
+  background: #f5c518; color: #000;
+  font-size: 13px; padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 0 100%);
+}
+#catalog-query-clear {
+  background: none; border: none; color: #000; cursor: pointer;
+  font-size: 16px; line-height: 1; padding: 0 var(--space-1);
+}
+#catalog-query-clear:hover { opacity: .6; }
+.catalog-query-chip[hidden] { display: none; } /* явно — свой display перебивает UA [hidden], та же история, что и у .account-menu-item выше */
+
+/* Стрелок больше нет (тап по самой странице листает вперёд, см. app.js) —
+   .carousel-dots стоит сама по себе, без обёртки .carousel-controls,
+   margin-top небольшой: точки — просто индикатор рядом со страницей,
+   а не отдельный ряд управления. */
+.carousel-dots {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+  /* Небольшой отступ сверху — от картинки точки всё же должны быть
+     визуально отделены, не впритык к рамке, хоть и остаются одной
+     смысловой группой (потому и меньше, чем margin-bottom ниже). */
+  margin-top: var(--space-2);
+  /* space-5, не space-3: снизу — граница с .story-info, а это уже не
+     часть читалки (картинка+пагинация), а отдельное действие («Читать»),
+     ей нужен более заметный отступ, чем внутри самой читалки. */
+  margin-bottom: var(--space-5);
+}
+.carousel-dot { width: 22px; height: 4px; background: var(--border); border: none; cursor: pointer; padding: 0; }
+.carousel-dot.active { background: var(--accent); }
+
+/* ── «Новые главы»: лента превью-обложек + разворот выбранной главы ──
+   Обложка показана целиком (пропорция 2/3), а не обрезана в кружок — та же
+   «фон вместо рамки» с двойным clip-path, что и у .nav-search-frame,
+   только компактнее. */
+.story-row {
+  /* padding-left и -right без парного отрицательного margin — никакой
+     самоотменяющейся арифметики на одном и том же скроллящемся элементе
+     (это она ломала выравнивание раньше). Секция сама без боковых
+     паддингов (см. .section выше) — так что это единственный источник
+     отступа с обеих сторон, как у .ae_af на мангалибе (padding:12px 16px
+     на их же overflow-x:auto ленте).
+     Без scroll-snap: он глушил тут padding (снап считает границы по
+     отдельному scroll-padding, а не по обычному padding контейнера) —
+     на мангалибе на этом же типе ленты snap тоже не используется. */
+  padding-left: var(--section-pad-x);
+  padding-right: var(--section-pad-x);
+  display: flex; gap: var(--space-4); overflow-x: auto;
+  scroll-behavior: smooth;
+  scrollbar-width: none; padding-bottom: var(--space-2);
+  /* overflow-x: auto неявно делает и overflow-y не-visible — без запаса
+     сверху hover-подъём обложки (.story-circle:hover .story-circle-frame)
+     обрезался бы этой же строкой. */
+  padding-top: var(--space-2);
+}
+.story-row::-webkit-scrollbar { display: none; }
+.story-circle {
+  flex: 0 0 auto; width: 64px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-2);
+  background: none; border: none; padding: 0;
+}
+.story-circle-frame {
+  width: 100%; aspect-ratio: 2 / 3;
+  background: var(--border);
+  padding: 2px;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+  transition: background-color .15s, transform .15s;
+}
+.story-circle-img {
+  display: block; width: 100%; height: 100%;
+  object-fit: cover; background: var(--surface2);
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
+}
+.story-circle.active .story-circle-frame { background: var(--accent); }
+.story-circle:hover .story-circle-frame { transform: translateY(-3px); }
+.story-circle-label {
+  font-size: 11px; color: var(--text-dim); text-align: center;
+  max-width: 64px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.story-circle.active .story-circle-label { color: var(--text); font-weight: 600; }
+
+/* Один разворот за раз — листается тапом по самой странице (вперёд по
+   кругу) или точками под ним, отдельно от переключения самого тайтла
+   кружками выше. */
+/* Обёртка вокруг карточки + стрелок (см. .story-nav-arrow ниже): margin,
+   раньше висевший прямо на .story-spread, теперь тут — так стрелки
+   (сёстры карточки, не её дети — иначе их обрезал бы её же clip-path,
+   как когда-то box-shadow) встают на то же расстояние от края экрана,
+   что и сама карточка. */
+.story-spread-row {
+  margin: var(--space-3) var(--section-pad-x) 0;
+  display: flex; align-items: center; justify-content: center; gap: var(--space-4);
+}
+.story-spread {
+  /* Явная width, а не «блок сам заполнит родителя» — тут она уже flex-
+     элемент .story-spread-row, без своей ширины сжалась бы по контенту,
+     а с ней у .story-stage внутри (width: 100%-от-родителя) не было бы
+     точки отсчёта — там и была видна почти нулевая карточка, срез угла
+     между стрелками без картинки. */
+  width: min(560px, 100%);
+  display: flex; justify-content: center;
+  position: relative; /* точка отсчёта для .story-lock — см. ниже */
+  /* --surface2, не --surface: тот же лёгкий сероватый оттенок, что у
+     полей поиска/аватарок в обеих темах — в светлой это не голый белый,
+     а приглушённый серо-бежевый, в тёмной чуть светлее самой подложки. */
+  background: var(--surface2); padding: var(--space-3);
+  clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%);
+}
+/* Замок в углу — виден только у вебтун-лент (см. isLongForm/renderPage/
+   renderLongForm в app.js, там же переключается [hidden]), состояние
+   общее на весь сайт (ScrollLock), по умолчанию открыто — блокирует
+   только внутренний overflow-y (см. .story-stage--scroll ниже), чтобы
+   случайный скролл мимо не утащил читалку, если пользователь сам решил
+   закрыть. Внутри .story-spread (не .story-stage!) — тот очищается
+   через innerHTML при каждом рендере страницы, кнопку унесло бы вместе
+   со старым содержимым.
+   Тот же приём «фон вместо рамки» со срезанным уголком, что у кнопки
+   аккаунта (.account-toggle-frame) — не дженерик-кружок, а в стиле
+   остального сайта. */
+.story-lock-frame {
+  position: absolute; top: calc(var(--space-3) + var(--space-2)); right: calc(var(--space-3) + var(--space-2));
+  z-index: 5;
+  width: 32px; height: 32px;
+  background: var(--border); border: none; padding: 1px; cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 0 100%);
+}
+.story-lock-frame[hidden] { display: none; } /* явно — иначе свой display перебивает UA [hidden] */
+.story-lock {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface2); color: var(--text);
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%);
+}
+.story-lock .icon { width: 16px; height: 16px; }
+.story-lock .icon-unlock { display: none; }
+.story-lock-frame.is-open .story-lock .icon-lock { display: none; }
+.story-lock-frame.is-open .story-lock .icon-unlock { display: inline-block; }
+/* Стрелки — только на десктопе (см. media ниже): на телефоне после
+   .story-spread-row и так нет лишнего места по бокам, там как раньше —
+   просто тап по развороту. */
+.story-nav-arrow {
+  display: none;
+}
+/* .story-stage — не подгоняется под контент: один и тот же большой
+   дефолтный размер для любого тайтла и любой страницы (aspect-ratio тут
+   свой, не выставляется через JS — тот трюк на части реальных Safari не
+   подхватывался и схлопывал блок в 0 без единой ошибки в консоли; этот
+   же aspect-ratio статический, объявлен в CSS один раз, а не меняется на
+   лету — с ним таких проблем нет). Любая открытая страница вписывается в
+   эту готовую коробку через JS (см. fitBox в app.js) и центрируется, если
+   она меньше — сцена от этого не меняется. */
+.story-stage {
+  display: flex; align-items: center; justify-content: center;
+  width: min(560px, 100%);
+  aspect-ratio: 2 / 3;
+  max-height: 78vh;
+  cursor: pointer; /* кликабельна вся сцена целиком, не только сама картинка */
+  position: relative; /* точка отсчёта для тени внизу — см. --scroll ниже */
+}
+/* Вебтун-режим (см. isLongForm/renderLongForm в app.js): страница сильно
+   длиннее коробки — вместо сжатия в неё целиком тут вертикальный скролл
+   на всю реальную длину. align-items: flex-start — читать начинают
+   сверху, а не с середины; cursor не pointer — тут листают скроллом, не
+   тапом. По умолчанию открыто (см. ScrollLock в app.js) — is-scroll-locked
+   добавляется, только если пользователь сам закрыл замок. */
+.story-stage--scroll {
+  align-items: flex-start;
+  overflow-y: auto;
+  cursor: default;
+}
+.story-stage--scroll.is-scroll-locked { overflow-y: hidden; }
+/* Тень снизу — отдельный элемент-сосед .story-stage (не псевдоэлемент
+   внутри неё!) — та скроллится, и ::after внутри уезжал бы вместе с
+   лентой вместо того чтобы стоять на месте. Сосед позиционируется
+   от .story-spread (не скроллится) теми же отступами, что и паддинг
+   карточки — вровень с нижним краем сцены.
+   Видна только пока замок закрыт (см. ScrollLock в app.js): подсказка,
+   что дальше ещё есть контент, но полистать его можно только после
+   разблокировки — открыли, скролл и так очевиден, тень убираем.
+   Цвет сведён к фону карточки (--surface2), чтобы не было жёсткой
+   границы на стыке. */
+.story-shadow {
+  position: absolute;
+  left: var(--space-3); right: var(--space-3); bottom: var(--space-3);
+  height: 36px;
+  background: linear-gradient(to bottom, transparent, var(--surface2));
+  pointer-events: none;
+  opacity: 0;
+}
+.story-shadow.is-visible { opacity: 1; }
+.story-strip { width: 100%; }
+/* На широком экране 560px — это прям во весь разворот, слишком широко
+   для одиночной страницы. min(...,100%) тут не трогаем — до этого
+   брейкпоинта телефоны и так упираются в 100%, сужаем только сам
+   десктопный потолок. */
+@media (min-width: 641px) {
+  .story-stage { width: min(420px, 100%); }
+  /* Сама карточка (.story-spread) раньше не ужималась вместе со сценой —
+     оставалась во всю ширину секции, и получалось, что узкая страница
+     стоит в углу огромного пустого белого поля, а не в компактной
+     подложке. width (не max-width!) — по ширине сцены + её же внутренний
+     паддинг (space-3 с обеих сторон): именно width даёт .story-stage
+     внутри определённую точку отсчёта для его собственного 100%, с
+     max-width тут вместо неё карточка схлопывалась почти в ноль (см.
+     комментарий у .story-spread). Центрирует саму карточку с рядом
+     стрелок — .story-spread-row (justify-content: center). */
+  .story-spread { width: min(calc(420px + var(--space-3) * 2), 100%); }
+  /* Стрелки чуть занимают пустое место по бокам карточки и дублируют тап
+     по развороту — простая квадратная кнопка, без «рамки»-клипа (это не
+     тот акцент, где нужен фирменный срез угла). */
+  .story-nav-arrow {
+    display: flex; flex: 0 0 auto; align-items: center; justify-content: center;
+    width: 44px; height: 44px;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); cursor: pointer;
+  }
+  .story-nav-arrow:hover { background: var(--surface); border-color: var(--accent); }
+  .story-nav-arrow .icon { width: 20px; height: 20px; }
+}
+/* Настоящая страница на телефоне иногда порезана на тайлы (см. PageTile
+   в handlers.go) — .story-page склеивает их в один разворот друг под
+   другом и вписывается в сцену (.story-stage) по своим реальным
+   width/height — см. fitBox в app.js, тут явные px, не CSS aspect-ratio. */
+.story-page {
+  display: flex; flex-direction: column;
+}
+/* .story-tile — оборачивает каждый тайл (и в .story-page, и в .story-strip
+   у длинной ленты, см. renderPage/renderLongForm в app.js): облачки
+   перевода (см. placeStoryBubbles) позиционируются В ПРЕДЕЛАХ своего
+   тайла — у каждого своя система координат, начинающаяся с (0,0) — а не
+   всего разворота/ленты целиком, иначе у второго и следующих тайлов
+   облачки съезжали бы вверх на высоту всех тайлов до него. position:
+   relative тут и есть тот якорь, что нужен .bubble (position:absolute,
+   см. её же комментарий выше). */
+.story-tile { position: relative; }
+/* Прямой потомок (>), не любой img внутри — .story-tile содержит ещё и
+   .bubble-text-img (текст облачка, см. placeStoryBubbles в app.js), она
+   на два уровня глубже (.story-tile > .bubble > img) и рисуется на
+   ПРОЗРАЧНОМ PNG (см. blocktext.go — фон нулевой), а не на скане
+   страницы: с обычным потомковым селектором var(--bg) красил её
+   прозрачные места тоже, вместо белого фона .bubble за ней. */
+.story-page .story-tile > img, .story-strip .story-tile > img {
+  display: block; width: 100%; height: auto; background: var(--bg);
+}
+/* Облачка тут (см. placeStoryBubbles в app.js) — тот же .bubble, что и в
+   читалке (см. её определение выше), но для этого маленького превью
+   нарочно фиксированный вид, без рамки и полупрозрачности: не настройка
+   пользователя (как --bubble-opacity/чекбокс "скрыть рамку" в читалке),
+   просто как это должно выглядеть тут всегда. Селектор специфичнее
+   голого .bubble — переопределяет только тут, читалку не трогает. */
+.story-tile .bubble { border: none; background: #fff; }
+
+.story-info {
+  /* margin, не .section-inset — то же самое, что у .story-spread: свой
+     фон и свой padding для текста внутри плашки. Сверху — 0: разделяющий
+     воздух уже даёт margin-top у .carousel-dots перед ней. */
+  display: flex; align-items: center; gap: var(--space-4);
+  margin: 0 var(--section-pad-x) 0; padding: var(--space-4) var(--space-5);
+  background: var(--accent); color: #fff;
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+  transition: background-color .15s;
+}
+.story-info:hover { background: var(--accent-bright); }
+.story-info-cover {
+  width: 40px; height: 54px; object-fit: cover; flex-shrink: 0;
+  background: var(--surface2);
+}
+.story-info-text { flex: 1; min-width: 0; }
+.story-info-title {
+  font-family: 'Unbounded'; font-weight: 700; font-size: 15px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.story-info-meta { font-size: 12px; opacity: .85; margin-top: var(--space-1); }
+.story-info .icon { width: 18px; height: 18px; flex-shrink: 0; }
+
+/* ── Footer ── */
+.footer {
+  position: relative;
+  margin-top: var(--space-7);
+  padding: var(--space-7) var(--space-7) var(--space-8);
+  background: var(--surface);
+  border-top: 3px solid var(--accent);
+  overflow: hidden;
+}
+/* Общий Ben-Day-паттерн для декоративных уголков (шапка и подвал) —
+   позиция и маска (в какой угол он «светит») задаются на месте использования
+   ниже, чтобы один и тот же .footer-dots одинаково работал и в компактной
+   .nav, и в высоком .footer. pointer-events: none — это чисто текстура,
+   не должна перехватывать клики по кнопкам под собой. */
+.footer-dots {
+  position: absolute;
+  background-image: radial-gradient(circle, var(--accent) 1.6px, transparent 1.8px);
+  background-size: 15px 15px;
+  opacity: .3;
+  pointer-events: none;
+}
+.footer .footer-dots {
+  bottom: 0; left: 0; width: 260px; height: 260px;
+  -webkit-mask-image: radial-gradient(circle at 0% 100%, black 0%, transparent 65%);
+          mask-image: radial-gradient(circle at 0% 100%, black 0%, transparent 65%);
+}
+.footer-logo { font-size: 26px; }
+.footer p { color: var(--text-dim); font-size: 14px; max-width: 420px; margin-top: var(--space-3); }
+
+/* ── Каталог (/catalog) — теги + тип фильтром во всплывающей панели от
+   кнопки, без режимов сортировки (обсуждали и отменили), сетка обложек
+   ниже. Те же токены и приёмы, что и везде: срезанный уголок «фон вместо
+   рамки», --accent для активного состояния, отступы по шкале --space-*.
+   Сама панель — один в один механика .account-menu в шапке (см. её
+   комментарий выше): opacity+scale вместо display:none (то нельзя
+   анимировать), .open вешается на обёртку через JS (см. catalog.js). */
+.catalog-filter-wrap { position: relative; margin-left: auto; }
+/* Кнопка «Фильтры» — двухслойная «рамка из фона» (как .account-toggle-
+   frame/.account-toggle в шапке): у однослойного border+clip-path бордер
+   пропадал бы ровно на срезанном уголке — clip-path обрезает и рамку
+   тоже, а не обводит новый край. Тут внешний слой — сплошь цвета рамки,
+   внутренний на 1px меньше — обводка остаётся видна по всему периметру,
+   включая срез. */
+.catalog-filter-toggle {
+  background: var(--border); border: none; padding: 1px; cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 11px, 100% 100%, 0 100%);
+  transition: background-color .15s;
+}
+.catalog-filter-toggle-inner {
+  display: flex; align-items: center; gap: var(--space-2);
+  background: var(--surface2); color: var(--text);
+  font-family: 'Golos Text'; font-weight: 600; font-size: 14px;
+  padding: var(--space-2) var(--space-4);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+}
+.catalog-filter-toggle-inner .icon { width: 16px; height: 16px; color: var(--accent); }
+.catalog-filter-toggle:hover,
+.catalog-filter-wrap.open .catalog-filter-toggle { background: var(--accent); }
+
+/* Панель — та же схема: -frame снаружи (цвет рамки, паддинг 1px), сама
+   .catalog-filters внутри (реальный фон/паддинг/контент), в самый раз
+   на 1px меньший clip-path. Открытие/закрытие теперь на -frame — она и
+   есть видимая снаружи граница панели. */
+.catalog-filters-frame {
+  position: absolute; top: calc(100% + var(--space-3)); right: 0; z-index: 60;
+  width: min(360px, 88vw);
+  background: var(--border);
+  padding: 1px;
+  clip-path: polygon(0 0, calc(100% - 17px) 0, 100% 17px, 100% 100%, 0 100%);
+  transform-origin: top right;
+  opacity: 0; visibility: hidden; transform: scale(.92);
+  transition: opacity .15s ease, transform .15s ease, visibility 0s .15s;
+}
+.catalog-filters {
+  position: relative;
+  display: flex; flex-direction: column; gap: var(--space-4);
+  background: var(--surface);
+  padding: var(--space-4);
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+  overflow: hidden;
+}
+.catalog-filter-wrap.open .catalog-filters-frame {
+  opacity: 1; visibility: visible; transform: scale(1);
+  transition: opacity .15s ease, transform .15s ease;
+}
+/* Комиксовые Ben-Day точки в углу панели — тот же приём, что в
+   .account-menu-dots (шапка) и .footer-dots (шапка/подвал). */
+.catalog-filters-dots {
+  position: absolute; right: 0; bottom: 0; width: 90px; height: 90px;
+  background-image: radial-gradient(circle, var(--accent) 1.4px, transparent 1.6px);
+  background-size: 12px 12px;
+  opacity: .25;
+  -webkit-mask-image: radial-gradient(circle at 100% 100%, black 0%, transparent 65%);
+          mask-image: radial-gradient(circle at 100% 100%, black 0%, transparent 65%);
+  pointer-events: none;
+}
+/* Треугольник-«хвостик» к кнопке — та же геометрия (skewX), что у
+   .account-menu-arrow в шапке. */
+.catalog-filter-arrow {
+  position: absolute; top: 100%; right: 14px; z-index: 61;
+  width: 16px; height: 9px;
+  transform: skewX(-12deg) translateY(-4px);
+  opacity: 0; visibility: hidden;
+  transition: opacity .15s ease, transform .15s ease, visibility 0s .15s;
+}
+.catalog-filter-wrap.open .catalog-filter-arrow {
+  transform: skewX(-12deg) translateY(3px);
+  opacity: 1; visibility: visible;
+  transition: opacity .15s ease, transform .15s ease;
+}
+.catalog-filter-arrow::before, .catalog-filter-arrow::after {
+  content: ""; position: absolute; top: 0; left: 0;
+  border-left: 8px solid transparent; border-right: 8px solid transparent;
+}
+.catalog-filter-arrow::before { border-bottom: 9px solid var(--border); }
+.catalog-filter-arrow::after { top: 1px; left: 1px; border-left-width: 7px; border-right-width: 7px; border-bottom: 8px solid var(--surface); }
+
+.catalog-filter-group { display: flex; flex-direction: column; gap: var(--space-2); position: relative; z-index: 1; }
+.catalog-filter-label {
+  font-family: 'Unbounded'; font-weight: 700; font-size: 13px;
+  color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em;
+}
+.catalog-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+/* Чипс — та же двухслойная «рамка из фона», что и везде (см. комментарий
+   у .catalog-filter-toggle выше) — при однослойном border+clip-path
+   рамка на срезанном уголке пропадала совсем. Тут это особенно заметно:
+   чипсов десятки, и у каждого «пустой» уголок бросался в глаза. */
+.catalog-chip {
+  background: var(--border); border: none; padding: 1px; cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 0 100%);
+  transition: background-color .15s;
+}
+.catalog-chip-inner {
+  display: block;
+  background: var(--surface2); color: var(--text);
+  padding: var(--space-2) var(--space-3);
+  font-family: 'Golos Text'; font-size: 13px;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
+  transition: background-color .15s, color .15s;
+}
+.catalog-chip:hover { background: var(--accent); }
+.catalog-chip.active { background: var(--accent); }
+.catalog-chip.active .catalog-chip-inner { background: var(--accent); color: #fff; }
+.catalog-more-tags {
+  align-self: flex-start;
+  background: none; border: none; color: var(--accent);
+  font-family: 'Golos Text'; font-weight: 600; font-size: 13px; cursor: pointer;
+  padding: var(--space-1) 0;
+}
+.catalog-more-tags:hover { color: var(--accent-bright); }
+.catalog-apply {
+  align-self: flex-start;
+  background: var(--accent); color: #fff; border: none;
+  font-family: 'Unbounded'; font-weight: 700; font-size: 14px;
+  padding: var(--space-3) var(--space-5); cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
+}
+.catalog-apply:hover { background: var(--accent-bright); }
+
+/* Сетка в 3 колонки, не один длинный столбец строк (30 карточек подряд —
+   слишком длинная простыня для прокрутки). Сама карточка внутри ячейки —
+   всё та же горизонтальная раскладка (обложка слева, текст справа). */
+.catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-5) var(--space-4);
+  padding: 0 var(--section-pad-x);
+}
+/* Пока грузится новая страница — старые карточки остаются на месте и
+   просто притушены (не пропадают), чтобы высота сетки не менялась ни на
+   миг (см. loadPage в catalog.js — раньше на это время сетку стирало
+   в одну строку "Загрузка...", и всё ниже дёргалось). */
+.catalog-grid.is-loading { opacity: .45; pointer-events: none; transition: opacity .1s; }
+/* Не рамка вокруг каждой карточки, а разделитель между ними — снизу,
+   между рядами (как было в самой первой версии-списке до перехода на
+   сетку в 3 колонки). */
+.catalog-card {
+  display: flex; gap: var(--space-3);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border);
+  color: inherit; text-decoration: none; /* теперь ссылка на /manga/{slug}, не div */
+  transition: opacity .15s;
+}
+.catalog-card:hover { opacity: .8; }
+.catalog-card-frame {
+  flex: 0 0 auto; width: 104px; aspect-ratio: 2 / 3;
+  background: var(--border);
+  padding: 2px;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+}
+.catalog-card-img {
+  display: block; width: 100%; height: 100%;
+  object-fit: cover; background: var(--surface2);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+}
+.catalog-card-body {
+  flex: 1 1 auto; min-width: 0; /* иначе длинное описание распирает флекс-строку */
+  display: flex; flex-direction: column; gap: var(--space-2);
+}
+.catalog-card-title {
+  font-family: 'Unbounded'; font-weight: 700; font-size: 15px; line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.catalog-card-tags { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+/* Мелкая нередактируемая плашка — не тот же .catalog-chip (тот кликабелен
+   и жирнее по весу, тут просто теги для чтения, без своей рамки). */
+.catalog-card-tag {
+  background: var(--surface2); color: var(--text-dim);
+  font-size: 11px; padding: 2px var(--space-2);
+  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 0 100%);
+}
+.catalog-card-meta { font-size: 12px; color: var(--accent); font-weight: 600; }
+
+/* Пагинация — «Назад» / номера / «Вперёд». Та же двухслойная «рамка из
+   фона», что у чипсов/«Фильтры»/поля перехода — раньше нарочно оставлял
+   плоской (как .carousel-dot), но рядом со всем остальным срезанным на
+   сайте она читалась инородно; теперь в общем стиле. */
+.catalog-pager {
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+}
+/* Верхняя пагинация — margin-top тут отделяет её от фильтров сверху, но
+   снизу (от самой сетки) без отступа она стояла бы впритык. */
+#catalog-pager-top { margin-bottom: var(--space-6); }
+.catalog-pager-btn {
+  background: var(--border); border: none; padding: 1px; cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 0 100%);
+  transition: background-color .15s;
+}
+.catalog-pager-btn-inner {
+  display: flex; align-items: center; justify-content: center;
+  min-width: 30px; height: 30px; padding: 0 var(--space-2);
+  background: var(--surface2); color: var(--text);
+  font-family: 'Golos Text'; font-weight: 600; font-size: 13px;
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%);
+  transition: background-color .15s, color .15s;
+}
+.catalog-pager-btn:hover:not(:disabled) { background: var(--accent); }
+.catalog-pager-btn.active { background: var(--accent); }
+.catalog-pager-btn.active .catalog-pager-btn-inner { background: var(--accent); color: #fff; }
+.catalog-pager-btn:disabled { opacity: .4; cursor: default; }
+.catalog-pager-ellipsis { color: var(--text-dim); padding: 0 var(--space-1); user-select: none; }
+
+/* Переход на страницу напрямую — при тысячах страниц кликать по соседним
+   номерам до условной 2000-й нереально. Поле и кнопка — та же двухслойная
+   «рамка из фона», что у чипсов/кнопки «Фильтры» (тут она к месту: это
+   не мелкий повторяющийся элемент, как номера страниц, а один заметный
+   контрол, ему пойдёт фирменный срез). */
+.catalog-pager-jump {
+  display: flex; align-items: center; justify-content: center; gap: var(--space-2);
+  margin-top: var(--space-3);
+  font-family: 'Golos Text'; font-size: 13px; color: var(--text-dim);
+}
+.catalog-pager-jump[hidden] { display: none; }
+.catalog-pager-input-frame {
+  background: var(--border); padding: 1px;
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 0 100%);
+}
+.catalog-pager-input {
+  width: 64px; text-align: center;
+  background: var(--surface2); color: var(--text); border: none; outline: none;
+  font-family: 'Golos Text'; font-size: 13px;
+  padding: var(--space-2);
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%);
+}
+/* Родные стрелочки number-инпута — не в стиле сайта, свои элементы
+   управления (клик по номеру страницы) уже есть выше. */
+.catalog-pager-input::-webkit-outer-spin-button,
+.catalog-pager-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.catalog-pager-input { appearance: textfield; -moz-appearance: textfield; }
+.catalog-pager-go {
+  background: var(--border); border: none; padding: 1px; cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 0 100%);
+}
+.catalog-pager-go-inner {
+  display: block;
+  background: var(--accent); color: #fff;
+  font-family: 'Golos Text'; font-weight: 600; font-size: 13px;
+  padding: var(--space-2) var(--space-3);
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
+}
+.catalog-pager-go:hover .catalog-pager-go-inner { background: var(--accent-bright); }
+
+/* ── Страница тайтла (/manga/{slug}) — обложка+инфо сверху, список глав
+   ниже. Те же токены/приёмы, что и везде: срезанный уголок, --accent,
+   .catalog-card-tag переиспользуем для жанров как есть (тот же смысл). */
+.manga-banner {
+  display: flex; gap: var(--space-6);
+  padding-top: var(--space-6); padding-bottom: var(--space-6);
+}
+.manga-cover-frame {
+  flex: 0 0 auto; width: 200px; aspect-ratio: 2 / 3;
+  background: var(--border); padding: 3px;
+  clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%);
+}
+.manga-cover-img {
+  display: block; width: 100%; height: 100%;
+  object-fit: cover; background: var(--surface2);
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);
+}
+.manga-meta { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.manga-type-line { font-size: 13px; color: var(--text-dim); font-weight: 600; }
+.manga-title { font-family: 'Unbounded'; font-weight: 700; font-size: 26px; line-height: 1.25; margin: 0; }
+.manga-alt-title { font-size: 14px; color: var(--text-dim); margin-top: -4px; }
+.manga-tags, .manga-badges { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-1); }
+/* Бейдж (статус/число глав) — не тег жанра: без своей рамки, просто
+   заливка чуть темнее фона, крупнее шрифт — по смыслу это факт о тайтле,
+   не фильтруемая метка. */
+.manga-badge {
+  background: var(--surface2); color: var(--text);
+  font-size: 12px; font-weight: 600; padding: var(--space-1) var(--space-3);
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%);
+}
+.manga-desc {
+  font-size: 14px; line-height: 1.6; color: var(--text-dim);
+  max-width: 640px; margin-top: var(--space-2);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.manga-desc.expanded { -webkit-line-clamp: unset; }
+.manga-desc-toggle {
+  align-self: flex-start;
+  background: none; border: none; color: var(--accent);
+  font-family: 'Golos Text'; font-weight: 600; font-size: 13px; cursor: pointer; padding: 0;
+}
+.manga-desc-toggle:hover { color: var(--accent-bright); }
+
+.manga-chapters { padding-bottom: var(--space-7); }
+.manga-chapters-head {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.manga-chapters-head h2 { font-family: 'Unbounded'; font-weight: 700; font-size: 18px; }
+.manga-chapter-list { display: flex; flex-direction: column; }
+.manga-chapter-row {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--border);
+  color: var(--text); cursor: pointer;
+  transition: background-color .15s;
+}
+.manga-chapter-row:hover { background: var(--surface2); }
+.manga-chapter-row .icon { width: 14px; height: 14px; color: var(--text-dim); flex-shrink: 0; }
+.manga-chapter-num { font-weight: 700; flex: 0 0 auto; min-width: 90px; }
+.manga-chapter-title {
+  flex: 1 1 auto; min-width: 0; color: var(--text-dim); font-size: 14px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.manga-chapter-pages { flex: 0 0 auto; font-size: 12px; color: var(--text-dim); }
+/* Точка-маркер у непереведённой главы — сознательно НЕ отдельный цвет, а
+   тот же --accent на двух уровнях непрозрачности: "ещё не запрошена" —
+   тусклая, "уже в очереди" — яркая. Обычная (переведённая) глава такой
+   точки не несёт вообще — с виду от заглушки её отличает только это. */
+.manga-chapter-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: var(--accent); }
+.manga-chapter-dot.is-stub { opacity: .35; }
+.manga-chapter-dot.is-queued { opacity: 1; }
+
+/* "Перезапустить OCR" — только у владельца сайта (см. restartBtnHTML в
+   manga.js), разрушительное действие — нарочно тусклая, не accent, чтобы
+   не выглядеть обычным элементом управления главой для всех остальных
+   (хотя не-владельцы её и так не видят вообще, это на случай будущих
+   правок вёрстки). Прямо внутри строки главы (в т.ч. внутри <a> у уже
+   переведённых) — flex: 0 0 auto, чтобы не съедало место у названия. */
+.manga-chapter-restart {
+  flex: 0 0 auto; width: 22px; height: 22px; line-height: 20px; text-align: center;
+  font-size: 14px; color: var(--text-dim); background: transparent;
+  border: 1px solid var(--border); border-radius: 50%; cursor: pointer; padding: 0;
+}
+.manga-chapter-restart:hover { color: var(--text); border-color: var(--text-dim); }
+
+/* Тост после клика по непереведённой главе — не блокирует страницу. */
+.manga-toast {
+  position: fixed; left: 50%; bottom: 24px; z-index: 200;
+  width: min(380px, 90vw);
+  background: var(--accent); color: #fff;
+  padding: var(--space-4) var(--space-5);
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+  font-family: 'Golos Text'; font-weight: 600; font-size: 14px; text-align: center; line-height: 1.5;
+  opacity: 0; pointer-events: none;
+  transform: translate(-50%, 12px);
+  transition: opacity .2s ease, transform .2s ease;
+}
+.manga-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ── Responsive ── */
+@media (max-width: 860px) {
+  .section { --section-pad-x: var(--space-4); }
+  .footer { padding-left: var(--space-4); padding-right: var(--space-4); }
+  .catalog-grid { grid-template-columns: repeat(2, 1fr); }
+}
+/* 1 колонка на телефоне — карточке (обложка+текст в ряд) нужна ширина,
+   в 3 узких колонках она была нечитаемой. "3 строки" при этом всё равно
+   держится — не фиксированным числом карточек на страницу, а тем, что
+   сам размер страницы пересчитывается под текущее число колонок (см.
+   currentColumns/LIMIT в catalog.js): тут 1×3, а не 3×3, как на десктопе. */
+@media (max-width: 560px) {
+  .catalog-grid { grid-template-columns: 1fr; }
+}
+
+
+/* На телефоне мало просто ужать всё в один ряд (поиск тогда сжимается до
+   бесполезной полоски) — шапка реально перестраивается на два ряда:
+   [лого · тема] сверху, поиск — во всю ширину под ними. */
+@media (max-width: 640px) {
+  /* Одна строка вместо переноса в две: DOM-порядок уже лого → поиск →
+     аккаунт, так что просто ужимаем поиск (он единственный, кому есть
+     куда сжиматься) вместо переноса .nav-search-wrap на свою строку. */
+  .nav { padding: var(--space-3) var(--space-4); gap: var(--space-3); }
+  .logo { font-size: 17px; flex-shrink: 0; }
+  .nav-search-wrap { flex: 1 1 auto; min-width: 0; max-width: none; }
+  .nav-search { padding: var(--space-2) var(--space-3); }
+  .nav-search input { min-width: 0; font-size: 13px; }
+  .nav-account { flex-shrink: 0; }
+
+  /* Без героя и каталога страница стала короче — те же 48/24px сверху/снизу
+     секции и 48/64px у подвала были рассчитаны на несколько секций подряд
+     и на телефоне читаются как лишний воздух, а не как пауза. */
+  .section { padding-top: var(--space-6); padding-bottom: var(--space-5); }
+  .section-head { margin-bottom: var(--space-4); }
+  .story-stage { max-height: 68vh; }
+  .story-info { padding: var(--space-3) var(--space-4); gap: var(--space-3); }
+  .footer { padding-top: var(--space-5); padding-bottom: var(--space-6); margin-top: var(--space-5); }
+  .footer .footer-dots { width: 170px; height: 170px; }
+
+  /* Обложка сбоку от текста на телефоне не помещается осмысленно —
+     сверху, по центру, текст под ней уже во всю ширину. */
+  .manga-banner { flex-direction: column; align-items: center; text-align: center; }
+  .manga-cover-frame { width: 160px; }
+  .manga-tags, .manga-badges { justify-content: center; }
+  .manga-desc { max-width: none; }
+  .manga-desc-toggle { align-self: center; }
+  .manga-chapter-title { white-space: normal; }
+}
+
+/* ── Регистрация (/finish-registration) — ник+аватарка после первого
+   входа через Google. Одна карточка по центру, те же приёмы (срезанный
+   уголок, --accent), что и везде — см. auth.go про сам поток. */
+.setup-card {
+  max-width: 420px; margin: var(--space-8) auto;
+  padding: var(--space-6);
+  background: var(--surface); border: 1px solid var(--border);
+  clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%);
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-3);
+  text-align: center;
+}
+.setup-title { font-family: 'Unbounded'; font-weight: 700; font-size: 22px; margin: 0; }
+.setup-sub { font-size: 14px; color: var(--text-dim); margin: 0 0 var(--space-2); }
+.setup-avatar-row { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); }
+.setup-avatar { width: 84px; height: 84px; border-radius: 50%; object-fit: cover; background: var(--surface2); }
+.setup-input {
+  width: 100%; box-sizing: border-box;
+  background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+  font-family: 'Golos Text'; font-size: 14px; padding: var(--space-3);
+}
+.setup-error { color: #e05252; font-size: 13px; }
+/* Кнопка "Готово" — тот же приём срезанного уголка, что и у
+   .catalog-pager-go (внешний слой — рамка/фон, внутренний — заливка). */
+.setup-submit {
+  width: 100%; background: var(--border); border: none; padding: 1px; cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
+}
+.setup-submit-inner {
+  display: block; background: var(--accent); color: #fff;
+  font-family: 'Golos Text'; font-weight: 700; font-size: 14px;
+  padding: var(--space-3);
+  clip-path: polygon(0 0, calc(100% - 13px) 0, 100% 13px, 100% 100%, 0 100%);
+}
+.setup-submit:hover .setup-submit-inner { background: var(--accent-bright); }
+.setup-avatar-btn { cursor: pointer; }
+
+/* ══════════════ Ридер (/chapter/{slug}) — см. reader.js/chapter.go про
+   то, что перенесено с localhost:8080 и что сознательно нет. Стилистика —
+   та же, что и у остального сайта: одни и те же токены (--bg/--surface/
+   --text/--border/--accent), тот же приём "срезанный уголок" для панелей,
+   светлая тема по умолчанию (см. common.js::initTheme) — раньше тут был
+   отдельный, всегда-тёмный набор цветов в обход общей темы сайта, теперь
+   его нет, ридер просто часть того же сайта, а не отдельный стиль. ── */
+.reader-body { margin: 0; min-height: 100vh; }
+/* Постраничный режим — документ вообще не должен скроллиться, листать
+   должны только тапы (см. webtoon click в reader.js). .webtoon сам по
+   себе overflow:hidden, но это ограничивает только ЕГО содержимое — не
+   сам документ, и на телефоне страницу всё равно можно утянуть скроллом/
+   резиновым оверскроллом (особенно из-за того, что 100vh в мобильных
+   браузерах часто чуть больше реально видимой области — то появляющаяся,
+   то прячущаяся адресная строка). Класс .reading-horizontal тот же, что
+   и на body (см. applyReadingMode в reader.js) — тут нужен и на html, и
+   на body разом, браузеры расходятся, какой из двух реальный скролл-
+   контейнер документа. overscroll-behavior — отдельно убирает именно
+   резиновый bounce, overflow:hidden его не блокирует. */
+html.reading-horizontal, body.reading-horizontal {
+  overflow: hidden; overscroll-behavior: none;
+}
+
+/* Верхняя шапка ридера — обычная .nav (слева стрелка назад + список глав,
+   справа настройки+аккаунт — прижаты через margin-left:auto у .reader-
+   settings-nav ниже), но, в отличие от остального сайта (там она
+   position:sticky, в потоке), тут — position:fixed поверх всего. Явно
+   попросили: шапка не должна ничего толкать своим появлением/исчезновением
+   (см. setNavHidden в reader.js — прячется при скролле в ленте, по тапу в
+   постраничном режиме) — а sticky-элемент, даже спрятанный display:none,
+   всё равно занимает своё место в потоке, и .webtoon под ним прыгало бы
+   каждый раз. Fixed решает это раз и навсегда: шапка просто лежит поверх
+   страницы, не деля с ней место, .webtoon одной и той же высоты всегда. */
+.reader-body .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; }
+
+/* Круглая иконка-кнопка "назад" — тот же двухслойный приём "фон вместо
+   рамки" + срезанный уголок, что и у .account-toggle-frame/.account-toggle
+   в этой же шапке (тот же размер 36×36, та же геометрия среза) — зеркало
+   кнопки аккаунта, не отдельная кнопка в своём стиле. Без подсветки при
+   наведении/нажатии вообще — по прямой просьбе. Тот же класс переиспользует
+   и кнопка настроек ниже — тот же внешний вид, чтобы обе иконки-кнопки в
+   шапке выглядели одной парой, а не двумя разными стилями. */
+.reader-icon-btn {
+  display: block; background: var(--border); border: none; padding: 1px; cursor: pointer;
+  width: 36px; height: 36px; flex-shrink: 0;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
+}
+.reader-icon-btn-inner {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 100%;
+  background: var(--surface2); color: var(--text-dim);
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 0 100%);
+}
+
+/* Скачивание длинной главы — склейка всех страниц в canvas (см.
+   downloadChapterImage в reader.js) может занять заметное время, крутим
+   иконку, пока идёт, и не даём нажать повторно (disabled там же в JS). */
+.reader-download-btn.is-loading .icon { animation: reader-download-spin 1s linear infinite; }
+@keyframes reader-download-spin { to { transform: rotate(360deg); } }
+
+/* Настройки + аккаунт — вплотную друг к другу (.nav-reader-right, свой
+   маленький gap вместо обычного зазора .nav), не порознь на расстоянии
+   обычного зазора между элементами шапки. margin-left:auto — на самой
+   .nav-reader-right (прижимает пару целиком к правому краю), поэтому
+   .nav-account внутри неё свой собственный margin-left:auto (глобальное
+   правило, нужное на остальных страницах, где .nav-account одна без пары)
+   тут обнуляем — иначе он бы расталкивал пару обратно порознь. */
+.nav-reader-right { display: flex; align-items: center; gap: var(--space-2); margin-left: auto; }
+.nav-reader-right .nav-account { margin-left: 0; }
+
+/* Настройки чтения — та же .account-menu/.chapter-menu визуальная система
+   (срезанный уголок, точки в углу, стрелка-хвостик). Открывается ВПРАВО
+   от кнопки не выйдет — кнопка сама теперь у правого края шапки, рядом с
+   аккаунтом (см. .nav-reader-right выше), так что панель, как и у самого
+   account-menu, растёт от правого края влево (right:0, transform-origin:
+   top right) — иначе вылезала бы за экран. */
+.reader-settings-nav { position: relative; }
+.reader-settings-menu {
+  position: absolute; top: calc(100% + var(--space-3)); right: 0; z-index: 60;
+  width: 240px;
+  background: var(--surface); border: 1px solid var(--border);
+  padding: var(--space-4);
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+  overflow: hidden;
+  transform-origin: top right;
+  opacity: 0; visibility: hidden; transform: scale(.92);
+  transition: opacity .15s ease, transform .15s ease, visibility 0s .15s;
+}
+.reader-settings-nav.open .reader-settings-menu {
+  opacity: 1; visibility: visible; transform: scale(1);
+  transition: opacity .15s ease, transform .15s ease;
+}
+.reader-settings-menu-dots {
+  position: absolute; right: 0; bottom: 0; width: 90px; height: 90px;
+  background-image: radial-gradient(circle, var(--accent) 1.4px, transparent 1.6px);
+  background-size: 12px 12px;
+  opacity: .25;
+  -webkit-mask-image: radial-gradient(circle at 100% 100%, black 0%, transparent 65%);
+          mask-image: radial-gradient(circle at 100% 100%, black 0%, transparent 65%);
+  pointer-events: none;
+}
+.reader-settings-menu-arrow {
+  position: absolute; top: 100%; right: 14px; z-index: 61;
+  width: 16px; height: 9px;
+  transform: skewX(-12deg) translateY(-4px);
+  opacity: 0; visibility: hidden;
+  transition: opacity .15s ease, transform .15s ease, visibility 0s .15s;
+}
+.reader-settings-nav.open .reader-settings-menu-arrow {
+  transform: skewX(-12deg) translateY(3px);
+  opacity: 1; visibility: visible;
+  transition: opacity .15s ease, transform .15s ease;
+}
+.reader-settings-menu-arrow::before, .reader-settings-menu-arrow::after {
+  content: ""; position: absolute; top: 0; left: 0;
+  border-left: 8px solid transparent; border-right: 8px solid transparent;
+}
+.reader-settings-menu-arrow::before { border-bottom: 9px solid var(--border); }
+.reader-settings-menu-arrow::after { top: 1px; left: 1px; border-left-width: 7px; border-right-width: 7px; border-bottom: 8px solid var(--surface); }
+.reader-settings-title { font-family: 'Unbounded'; font-weight: 700; font-size: 13px; margin-bottom: var(--space-3); }
+.reader-settings-row { display: flex; flex-direction: column; gap: var(--space-2); font-size: 12px; color: var(--text-dim); margin-bottom: var(--space-3); }
+/* Ползунок + мини-кнопка сброса в одну строку (см. reader.html) — flex:1
+   у самого input вместо width:100% (было, пока рядом с ним ничего не
+   стояло): иначе он бы не оставил места для кнопки в той же строке. */
+.reader-settings-slider-row { display: flex; align-items: center; gap: var(--space-2); }
+.reader-settings-slider-row input[type=range] { flex: 1; accent-color: var(--accent); }
+.reader-settings-mini-reset {
+  display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%;
+  background: none; color: var(--text-dim); cursor: pointer;
+  transition: color .15s, background-color .15s;
+}
+.reader-settings-mini-reset .icon { width: 14px; height: 14px; }
+.reader-settings-mini-reset:hover { color: var(--accent-bright); background: var(--surface2); }
+.reader-settings-check { display: flex; align-items: center; gap: var(--space-2); font-size: 12px; color: var(--text-dim); cursor: pointer; }
+/* Переключатель режима чтения — простая пара кнопок-сегментов, не
+   срезанный уголок: это внутренний контрол панели настроек, а не
+   самостоятельный элемент шапки, ему не нужен тот же визуальный вес. */
+.reader-mode-toggle { display: flex; border: 1px solid var(--border); }
+.reader-mode-btn {
+  flex: 1; padding: var(--space-2) var(--space-1); text-align: center;
+  font-family: 'Golos Text'; font-size: 12px; font-weight: 600;
+  color: var(--text-dim); cursor: pointer; transition: background-color .15s, color .15s;
+}
+.reader-mode-btn:not(:last-child) { border-right: 1px solid var(--border); }
+.reader-mode-btn[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.reader-mode-btn:not([aria-pressed="true"]):hover { background: var(--surface2); }
+/* Сброс настроек — тот же вид, что и у .reader-clear-edits (тоже кнопка
+   "вернуть как было", просто для другой пары настроек, см. reader.html),
+   только не position:fixed — тут она в потоке, внутри самой панели. */
+.reader-settings-reset {
+  width: 100%; margin-top: var(--space-3);
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text-dim); font-family: 'Golos Text'; font-size: 12px; font-weight: 600;
+  padding: var(--space-2) var(--space-3); cursor: pointer;
+}
+.reader-settings-reset:hover { color: #fff; background: var(--accent-bright); border-color: transparent; }
+
+/* Список глав — кнопка-триггер тем же приёмом, что и .catalog-filter-
+   toggle/-toggle-inner (текст+иконка, а не голый квадрат, как у
+   .reader-back): двухслойный "фон вместо рамки", заливка --accent при
+   наведении/открытом состоянии — тут это уместно (в отличие от
+   .reader-back выше, это настоящая кнопка-раскрывашка, ей нужно явно
+   выглядеть нажимаемой). Стрелка — переиспользованный icon-chevron-right,
+   повёрнутый на 90deg (своей "вниз" иконки в /static/icons нет смысла
+   заводить ради одного места), крутится на 180deg при открытой панели. */
+.chapter-nav { position: relative; }
+.chapter-toggle {
+  background: var(--border); border: none; padding: 1px; cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 11px, 100% 100%, 0 100%);
+  transition: background-color .15s;
+}
+.chapter-toggle-inner {
+  display: flex; align-items: center; gap: var(--space-2);
+  background: var(--surface2); color: var(--text);
+  font-family: 'Golos Text'; font-weight: 600; font-size: 14px;
+  padding: var(--space-2) var(--space-4);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+  white-space: nowrap;
+}
+.chapter-toggle-caret {
+  width: 14px; height: 14px; color: var(--accent);
+  transform: rotate(90deg); transition: transform .15s ease;
+}
+.chapter-nav.open .chapter-toggle-caret { transform: rotate(-90deg); }
+.chapter-toggle:hover, .chapter-nav.open .chapter-toggle { background: var(--accent); }
+
+/* Сама панель — один в один механика/вид .account-menu (см. её
+   комментарий выше в этом файле): opacity+scale вместо display:none,
+   .open вешается на обёртку через JS (см. renderChapterMenu в reader.js).
+   Растёт от ЛЕВОГО края кнопки вправо (left:0, transform-origin: top
+   left) — кнопка-триггер сама теперь у левого края шапки, рядом со
+   стрелкой назад (см. reader.html), а не по центру, как раньше: если бы
+   панель по-прежнему центрировалась под кнопкой (left:50%), у самого
+   края экрана она вылезала бы за его левую границу. */
+.chapter-menu {
+  position: absolute; top: calc(100% + var(--space-3)); left: 0;
+  transform-origin: top left;
+  z-index: 60; width: min(320px, 90vw);
+  background: var(--surface); border: 1px solid var(--border);
+  padding: var(--space-2);
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+  overflow: hidden;
+  opacity: 0; visibility: hidden; transform: scale(.92);
+  transition: opacity .15s ease, transform .15s ease, visibility 0s .15s;
+}
+.chapter-nav.open .chapter-menu {
+  opacity: 1; visibility: visible; transform: scale(1);
+  transition: opacity .15s ease, transform .15s ease;
+}
+/* Комиксовые Ben-Day точки в углу панели — тот же приём, что у
+   .account-menu-dots/.footer-dots — четвёртое применение того же узора. */
+.chapter-menu-dots {
+  position: absolute; right: 0; bottom: 0; width: 90px; height: 90px;
+  background-image: radial-gradient(circle, var(--accent) 1.4px, transparent 1.6px);
+  background-size: 12px 12px;
+  opacity: .25;
+  -webkit-mask-image: radial-gradient(circle at 100% 100%, black 0%, transparent 65%);
+          mask-image: radial-gradient(circle at 100% 100%, black 0%, transparent 65%);
+  pointer-events: none;
+}
+/* Треугольник-"хвостик" — та же геометрия (skewX), что у .account-menu-
+   arrow/.reader-settings-menu-arrow, только left:14px вместо right:14px —
+   у левого края кнопки, не у правого (панель теперь тоже растёт влево-
+   направо от левого края, а не от правого). */
+.chapter-menu-arrow {
+  position: absolute; top: 100%; left: 14px; z-index: 61;
+  width: 16px; height: 9px;
+  transform: skewX(-12deg) translateY(-4px);
+  opacity: 0; visibility: hidden;
+  transition: opacity .15s ease, transform .15s ease, visibility 0s .15s;
+}
+.chapter-nav.open .chapter-menu-arrow {
+  transform: skewX(-12deg) translateY(3px);
+  opacity: 1; visibility: visible;
+  transition: opacity .15s ease, transform .15s ease;
+}
+.chapter-menu-arrow::before, .chapter-menu-arrow::after {
+  content: ""; position: absolute; top: 0; left: 0;
+  border-left: 8px solid transparent; border-right: 8px solid transparent;
+}
+.chapter-menu-arrow::before { border-bottom: 9px solid var(--border); }
+.chapter-menu-arrow::after { top: 1px; left: 1px; border-left-width: 7px; border-right-width: 7px; border-bottom: 8px solid var(--surface); }
+
+/* Список — .account-menu-item переиспользован буквально (тот же паддинг/
+   hover/шрифт, что и в меню аккаунта, см. её комментарий выше), .chapter-
+   menu-item добавляет только своё: точку статуса прижатую к правому краю
+   (та же .manga-chapter-dot, что на странице тайтла) и текущую главу
+   акцентным цветом. Список — свой прокручиваемый блок ВНУТРИ статичной
+   рамки .chapter-menu (точки в углу и паддинг панели не должны укатываться
+   вместе со списком) — на главах может быть много, без max-height+scroll
+   длинный список выпирал бы за экран. Сам скроллбар спрятан (тот же приём,
+   что у .story-row на главной) — скролл работает, полоса не отвлекает. */
+.chapter-menu-list {
+  max-height: min(60vh, 420px); overflow-y: auto;
+  scrollbar-width: none;
+}
+.chapter-menu-list::-webkit-scrollbar { display: none; }
+.chapter-menu-item { justify-content: space-between; }
+.chapter-menu-item .manga-chapter-dot { margin-left: var(--space-2); flex-shrink: 0; }
+.chapter-menu-item.current { color: var(--accent-bright); font-weight: 700; }
+
+/* Кнопки редактора — раньше своей плавающей группой внизу справа
+   (position:fixed), теперь обычным flex-элементом в правом кластере
+   шапки (.nav-reader-right, см. reader.html) — рядом с настройками и
+   аккаунтом, в общем потоке, а не поверх страниц. Слева направо: удалить,
+   добавить, редактировать/читать — большая кнопка-переключатель справа,
+   к ней и "прижаты" остальные (см. запрос — "их слева поставь", когда
+   ещё плавали). Кружки удалить/добавить уменьшены с 44px до 30px — в
+   плавающей группе 44px было ок (кнопка сама себе хозяин на пустом
+   месте), а в шапке рядом с 36px-кнопками аккаунта/настроек смотрелась
+   бы непропорционально крупной. */
+.reader-fab-row { display: flex; align-items: center; gap: var(--space-2); }
+/* Кнопка сброса всех несохранённых правок сессии — плавающая, отдельно
+   от переехавшего в шапку .reader-fab-row (см. её комментарий в
+   reader.html): разовое опасное действие, ему не место среди кнопок
+   навигации. bottom:16px, не 68px, как раньше — раньше это было "чуть
+   выше .reader-fab-row" (тот стоял на bottom:16px), сейчас под ней
+   ничего нет, отступ от края экрана достаточен сам по себе. */
+.reader-clear-edits {
+  position: fixed; right: 16px; bottom: 16px; z-index: 90;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text-dim); font-family: 'Golos Text'; font-size: 12px; font-weight: 600;
+  padding: var(--space-2) var(--space-3); border-radius: 8px; cursor: pointer;
+}
+.reader-clear-edits:hover { color: #fff; background: var(--accent-bright); border-color: transparent; }
+.reader-clear-edits[hidden] { display: none; } /* явно — та же история с [hidden], см. .account-menu-item выше */
+
+/* ══════════════ Озвучка главы (см. voicePlayer в reader.js, voice.go на
+   бэкенде) — три независимых плавающих куска, см. их порядок и назначение
+   в комментарии над разметкой в reader.html. ══════════════ */
+
+/* 1. Модалка генерации — тёмная подложка на весь экран, карточка по
+   центру, полоса прогресса. z-index выше .voice-bar (100 vs 90) — пока
+   идёт генерация, сама панель ещё не нужна (плеер стартует уже после). */
+.bubble-edit-modal {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.6);
+  padding: var(--space-4);
+}
+.bubble-edit-modal[hidden] { display: none; }
+.bubble-edit-box {
+  width: min(420px, 100%);
+  background: var(--surface); border: 1px solid var(--border);
+  padding: var(--space-5);
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
+}
+.bubble-edit-title { font-family: 'Unbounded'; font-weight: 700; font-size: 15px; margin-bottom: var(--space-3); }
+.bubble-edit-textarea {
+  width: 100%; box-sizing: border-box; resize: vertical; min-height: 100px;
+  background: var(--bg); color: var(--text); border: 1px solid var(--border);
+  font-family: 'Golos Text'; font-size: 14px; padding: var(--space-3);
+}
+.bubble-edit-actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-4); }
+.bubble-edit-cancel, .bubble-edit-save, .bubble-edit-names-toggle {
+  font-family: 'Golos Text'; font-weight: 600; font-size: 13px;
+  padding: var(--space-2) var(--space-4); cursor: pointer; border: none;
+}
+.bubble-edit-cancel { background: none; border: 1px solid var(--border); color: var(--text-dim); }
+.bubble-edit-cancel:hover { color: #fff; background: var(--accent-bright); border-color: transparent; }
+.bubble-edit-save { background: var(--accent); color: #fff; }
+.bubble-edit-save:hover { background: var(--accent-bright); }
+/* "Имена" — слева от Отмена/Сохранить (margin-right:auto толкает
+   остальные две кнопки вправо, как и было без этой кнопки). */
+.bubble-edit-names-toggle { background: none; border: 1px solid var(--border); color: var(--text-dim); margin-right: auto; }
+.bubble-edit-names-toggle:hover { color: var(--text); border-color: var(--text-dim); }
+.bubble-edit-names {
+  display: flex; flex-wrap: wrap; gap: var(--space-2);
+  margin-top: var(--space-3); max-height: 140px; overflow-y: auto;
+}
+.bubble-edit-names[hidden] { display: none; }
+.bubble-edit-name-chip {
+  font-family: 'Golos Text'; font-size: 13px; font-weight: 600;
+  padding: var(--space-1) var(--space-3); cursor: pointer;
+  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+}
+.bubble-edit-name-chip:hover { background: var(--accent); color: #fff; border-color: transparent; }
+.bubble-edit-names-empty { font-size: 13px; color: var(--text-dim); }
+
+.download-parts-modal {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.6);
+  padding: var(--space-4);
+}
+.download-parts-modal[hidden] { display: none; }
+.download-parts-box {
+  width: min(360px, 100%);
+  background: var(--surface); border: 1px solid var(--border);
+  padding: var(--space-5);
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
+}
+.download-parts-title { font-family: 'Unbounded'; font-weight: 700; font-size: 15px; margin-bottom: var(--space-3); }
+.download-parts-label { display: block; font-size: 13px; color: var(--text-dim); margin-bottom: var(--space-2); }
+.download-parts-input {
+  width: 100%; box-sizing: border-box;
+  background: var(--bg); color: var(--text); border: 1px solid var(--border);
+  font-family: 'Golos Text'; font-size: 14px; padding: var(--space-2) var(--space-3);
+}
+.download-parts-actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-4); }
+.download-mode { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-4); }
+.download-mode-opt { display: flex; align-items: flex-start; gap: var(--space-2); font-size: 13px; color: var(--text); cursor: pointer; line-height: 1.35; }
+.download-mode-opt input { margin-top: 2px; accent-color: var(--accent); }
+#download-parts-row { margin-bottom: var(--space-3); }
+#download-parts-row[hidden] { display: none; }
+.download-range-row { display: flex; align-items: center; gap: var(--space-2); font-size: 13px; color: var(--text-dim); }
+.download-range-row .download-parts-input { width: 90px; }
+
+.voice-gen-modal {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.6);
+}
+.voice-gen-modal[hidden] { display: none; } /* явно — свой display перебивает UA [hidden], та же история, см. .account-menu-item выше */
+.voice-gen-box {
+  width: min(320px, calc(100vw - 32px));
+  background: var(--surface); border: 1px solid var(--border);
+  padding: var(--space-5);
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
+  text-align: center;
+}
+.voice-gen-title { font-family: 'Unbounded'; font-weight: 700; font-size: 15px; margin-bottom: var(--space-4); }
+.voice-gen-bar-wrap { height: 6px; background: var(--surface2); overflow: hidden; margin-bottom: var(--space-2); }
+.voice-gen-bar-fill { height: 100%; width: 0%; background: var(--accent); transition: width .2s ease; }
+.voice-gen-counter { font-size: 12px; color: var(--text-dim); margin-bottom: var(--space-4); }
+.voice-gen-cancel {
+  background: none; border: 1px solid var(--border); color: var(--text-dim);
+  font-family: 'Golos Text'; font-size: 12px; font-weight: 600;
+  padding: var(--space-2) var(--space-4); cursor: pointer;
+}
+.voice-gen-cancel:hover { color: #fff; background: var(--accent-bright); border-color: transparent; }
+
+/* 2. Панель проигрывания — плавающая снизу по центру, появляется, как
+   только плеер реально заиграл (см. beginVoicePlayback в reader.js). */
+.voice-bar {
+  position: fixed; left: 50%; bottom: 16px; z-index: 90; transform: translateX(-50%);
+  display: flex; align-items: center; gap: var(--space-2);
+  background: var(--surface2); border: 1px solid var(--border);
+  padding: var(--space-2); border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+}
+.voice-bar[hidden] { display: none; } /* явно — свой display перебивает UA [hidden] */
+/* Прячется вместе с шапкой (см. setNavHidden в reader.js) — тот же класс,
+   что и у .nav.reader-nav-hidden. */
+.voice-bar.reader-nav-hidden { display: none; }
+.voice-bar-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  background: var(--surface); border: none; color: var(--text);
+  font-size: 14px; cursor: pointer;
+}
+.voice-bar-btn:hover { background: var(--accent); color: #fff; }
+.voice-bar-btn--main { width: 40px; height: 40px; background: var(--accent); color: #fff; font-size: 16px; }
+.voice-bar-btn--main:hover { background: var(--accent-bright); }
+.voice-bar-btn--mini { width: 26px; height: 26px; font-size: 12px; color: var(--text-dim); }
+.voice-bar-sep { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
+
+/* 3. Скорости — всплывает от шестерёнки в .voice-bar, та же логика
+   открытия/закрытия (класс .open), что и у .reader-settings-nav, но
+   position:fixed (не relative-якорь внутри шапки — .voice-bar сама
+   плавающая) и растёт ВВЕРХ от бара, а не вниз от кнопки. */
+.voice-speed-menu {
+  position: fixed; left: 50%; bottom: 72px; z-index: 91; transform: translateX(-50%) scale(.92);
+  width: 220px;
+  background: var(--surface); border: 1px solid var(--border);
+  padding: var(--space-4);
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
+  opacity: 0; visibility: hidden;
+  transition: opacity .15s ease, transform .15s ease, visibility 0s .15s;
+}
+.voice-speed-menu.open {
+  opacity: 1; visibility: visible; transform: translateX(-50%) scale(1);
+  transition: opacity .15s ease, transform .15s ease;
+}
+.voice-speed-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); font-size: 12px; color: var(--text-dim); margin-bottom: var(--space-3); }
+.voice-speed-controls { display: flex; align-items: center; gap: var(--space-2); }
+.voice-speed-val { min-width: 32px; text-align: center; color: var(--text); font-weight: 600; }
+.voice-mini {
+  display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+  background: var(--surface2); border: none; color: var(--text); cursor: pointer;
+}
+.voice-mini:hover { background: var(--accent); color: #fff; }
+.voice-speed-reset {
+  width: 100%;
+  background: var(--surface2); border: 1px solid var(--border); color: var(--text-dim);
+  font-family: 'Golos Text'; font-size: 12px; font-weight: 600;
+  padding: var(--space-2) var(--space-3); cursor: pointer;
+}
+.voice-speed-reset:hover { color: #fff; background: var(--accent-bright); border-color: transparent; }
+
+/* Пузырь, который сейчас озвучивается — та же "рамка" системы, что и у
+   .bubble.selected в редакторе (см. выше), другой цвет, чтобы не путать
+   "выделено для правки" с "сейчас звучит". */
+.bubble-playing { outline: 3px solid var(--accent); outline-offset: 2px; z-index: 15; }
+.reader-add-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+  background: var(--accent); color: #fff; border: none;
+  cursor: pointer;
+}
+/* явно — свой display перебивает UA [hidden] (та же история, что уже не
+   раз ловилась в этом файле — см. .account-menu-item/.account-toggle-
+   avatar/.reader-comment-badge выше). Без этой строки кнопки "+"/🗑
+   видны ВСЕГДА, даже когда editMode выключен и reader.js честно
+   проставил им атрибут hidden. */
+.reader-add-btn[hidden] { display: none; }
+.reader-add-btn:hover { background: var(--accent-bright); }
+.reader-delete-btn { background: var(--surface2); color: var(--text-dim); }
+.reader-delete-btn:disabled { opacity: .35; cursor: default; pointer-events: none; }
+.reader-delete-btn:not(:disabled):hover { background: var(--accent-bright); color: #fff; }
+.reader-add-btn .icon { width: 15px; height: 15px; }
+/* Слой скрыт — кнопка серая, как неактивная (глаз перечёркнут, см. reader.js). */
+.reader-clean-btn.is-off, .reader-text-btn.is-off { background: var(--surface2); color: var(--text-dim); }
+.reader-clean-btn.is-off:hover, .reader-text-btn.is-off:hover { background: var(--accent-bright); color: #fff; }
+/* "Скрыть текст" (reader-text-btn): прячем только сам текст перевода, блок
+   остаётся на месте — кликабельный и с рамкой при выделении. */
+body.text-off .bubble-text-img, body.text-off .bubble-text-draft { visibility: hidden; }
+/* Сам переключатель режима — тот же квадрат 36×36 (40×40 на тач-экране),
+   что и у .reader-icon-btn (настройки/назад рядом), без своих width/
+   height — вместо того чтобы расти под текст, текст ("РЕДАКТИРОВАТЬ"/
+   "МАНГУ" в две строки, см. <br> в reader.js) сжат под фиксированный
+   размер: совсем маленький шрифт, отрицательный letter-spacing и почти
+   нулевой паддинг, чтобы уместиться в ~34px внутренней ширины. Состояние
+   "включён" — подсвечиваем внутренний слой акцентом, тот же приём, что у
+   .chapter-toggle при открытой панели. Видна всегда (это и есть кнопка
+   включения режима), в отличие от +/🗑, которые появляются только после
+   её нажатия — поэтому у неё нет .reader-add-btn в classList и своего
+   [hidden] тут не нужно. */
+.reader-edit-btn .reader-icon-btn-inner {
+  padding: 1px;
+  /* Golos Text — тот же шрифт, что и у .story-circle-label на главной
+     (там он просто наследуется от body, тут задан явно). */
+  font-family: 'Golos Text'; font-weight: 700; font-size: 5px; letter-spacing: -.02em;
+  line-height: 1.15; text-align: center; white-space: nowrap; color: #000;
+}
+.reader-edit-btn.active .reader-icon-btn-inner { background: var(--accent); color: #fff; }
+
+/* Кнопка озвучки — тот же квадрат 36×36, что и у соседей в .reader-fab-row,
+   просто эмодзи вместо текста (см. voicePlayer в reader.js — сама кнопка
+   через [hidden] показывается только в вертикальном режиме чтения). */
+.reader-voice-btn .reader-icon-btn-inner { font-size: 15px; }
+.reader-voice-btn.active .reader-icon-btn-inner { background: var(--accent); }
+.reader-voice-btn[hidden] { display: none; } /* явно — .reader-icon-btn ставит свой display, перебивая UA [hidden], та же история, см. .account-menu-item выше */
+
+/* padding-top — только чтобы шапка (position:fixed, см. .reader-body .nav
+   выше) не закрывала собой верх самой первой страницы: отступ постоянный
+   (не меняется вместе с --reader-header-h при скрытии/показе шапки на
+   скролле, см. updateHeaderHeightVar в reader.js — он специально не
+   реагирует на navHidden) — иначе лента дёргалась бы при каждом
+   скрытии/показе, ровно то, чего мы только что добивались избежать,
+   сделав шапку fixed. В постраничном режиме не нужен — там переопределён
+   в 0 ниже (шапка там намеренно лежит поверх страницы, см. её блок). */
+.webtoon { max-width: 900px; margin: 0 auto; padding-top: var(--reader-header-h, 68px); }
+.webtoon-page { position: relative; line-height: 0; }
+.webtoon-page img { width: 100%; height: auto; display: block; }
+/* Вотермарка — полупрозрачная надпись в правом нижнем углу страницы (см.
+   data-wm в reader.js). Белая с тонкой тёмной тенью — читается и на светлом,
+   и на тёмном фоне; клики проходят сквозь неё. line-height задан явно —
+   у .webtoon-page он 0. Размер шрифта от ширины окна (страница не шире
+   ~900px), не от контейнера: container-type менял бы раскладку страницы. */
+.webtoon-page[data-wm]::after {
+  content: "https://t.me/mangALLai";
+  position: absolute; right: 8px; bottom: 6px; z-index: 2;
+  font: 500 clamp(9px, 1.5vw, 14px)/1 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  color: #fff; opacity: .5; letter-spacing: .01em;
+  text-shadow: 0 0 2px rgba(0,0,0,.65), 0 0 4px rgba(0,0,0,.35);
+  pointer-events: none; user-select: none; white-space: nowrap;
+}
+/* Очищенный слой страницы (см. cleanpage.go) — поверх оригинала ровно по
+   его размеру, под облачками (.bubble имеет z-index:1). pointer-events:none
+   — клики должны проходить к облачкам/странице. Правила ниже перебивают и
+   .webtoon-page img, и постраничный режим (width:auto/max-height). */
+.webtoon-page img.page-clean,
+body.reading-horizontal .webtoon-page img.page-clean {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+  max-width: none; max-height: none; pointer-events: none; z-index: 0;
+}
+/* По прямой просьбе — прямоугольного пузыря ("бумага" + рамка .bubble) на
+   страницах с очищенным слоем нет вообще, в любом режиме: и в чтении, и в
+   редактировании, и при скрытом слое. Остаётся только текст перевода.
+   Исключения — состояния, у которых рамка несёт смысл: выбранное облачко
+   (.selected — иначе не видно, что именно правишь) и предложенные правки
+   (.proposal-pending/-delete). Блок при этом остаётся кликабельным/
+   перетаскиваемым — прозрачный фон hit-test не отключает. Страницы БЕЗ слоя
+   не трогаем: там "бумага" + заплатка — единственное, что закрывает
+   оригинальный текст. */
+.webtoon-page.has-clean .bubble:not(.selected):not(.proposal-pending):not(.proposal-delete) {
+  background: transparent; border-color: transparent;
+}
+/* "Скрыть заливку" (chk-hide-clean в reader.html): слой не показываем.
+   Прямоугольный пузырь при этом тоже не возвращается (см. выше) — перевод
+   ляжет прямо на оригинальный текст, это нужно только чтобы сверить. */
+body.clean-off .webtoon-page img.page-clean { display: none; }
+.webtoon-page-loading { min-height: 60vh; display: flex; align-items: center; justify-content: center; color: var(--text-dim); font-size: 13px; }
+
+/* Удалить страницу целиком (см. deletePageEntirely в reader.js) — видна
+   только в режиме редактирования (body.edit-mode, тот же класс, что уже
+   переключает editToggleBtn), в углу каждой страницы поверх картинки. */
+.reader-page-delete-btn {
+  display: none; position: absolute; top: 10px; right: 10px; z-index: 6;
+  width: 34px; height: 34px; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.6); border: none; border-radius: 6px; cursor: pointer;
+  color: #fff;
+}
+.reader-page-delete-btn .icon { width: 16px; height: 16px; }
+.reader-page-delete-btn:hover { background: #e63946; }
+body.edit-mode .reader-page-delete-btn { display: flex; }
+
+/* Персонажи + пересказ главы внизу (см. renderChapterInfo в reader.js) —
+   та же ширина, что и сама лента страниц, чтобы не выбивалось по краям. */
+.chapter-info {
+  max-width: 900px; margin: var(--space-6) auto; padding: 0 var(--space-4) var(--space-8);
+}
+.chapter-info[hidden] { display: none; }
+.chapter-info-characters, .chapter-info-summary { margin-bottom: var(--space-5); }
+.chapter-info-title {
+  font-family: 'Unbounded'; font-weight: 700; font-size: 14px;
+  color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em;
+  margin-bottom: var(--space-3);
+}
+.chapter-info-names-list { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.chapter-info-name-chip {
+  font-family: 'Golos Text'; font-size: 13px; font-weight: 600;
+  padding: var(--space-1) var(--space-3);
+  background: var(--surface); border: 1px solid var(--border); color: var(--text);
+}
+.chapter-info-summary-text {
+  font-family: 'Golos Text'; font-size: 14px; line-height: 1.5; color: var(--text);
+  margin: 0;
+}
+
+/* Владелец сайта — редактор общего на всю мангу глоссария персонажей
+   (manga_characters, см. characters.go), см. renderCharacterEditPanel в
+   reader.js. Кнопка видна всем (как и editToggleBtn у самого редактора
+   облачков) — незалогиненный/не-владелец просто получит alert по клику. */
+.chapter-info-title-row {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.chapter-info-title-row .chapter-info-title { margin-bottom: 0; }
+.chapter-info-edit-toggle {
+  font-family: 'Golos Text'; font-size: 12px; font-weight: 600;
+  padding: 2px var(--space-2); background: transparent; border: 1px solid var(--border);
+  color: var(--text-dim); cursor: pointer; border-radius: 4px;
+}
+.chapter-info-edit-toggle:hover { color: var(--text); border-color: var(--text-dim); }
+.chapter-info-edit-panel { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-4); }
+.chapter-info-edit-panel[hidden] { display: none; }
+.chapter-info-edit-row {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2); background: var(--surface); border: 1px solid var(--border);
+}
+.chapter-info-edit-row input[type="text"] {
+  font-family: 'Golos Text'; font-size: 13px; padding: 4px 8px;
+  background: var(--bg); border: 1px solid var(--border); color: var(--text); min-width: 0;
+}
+.chapter-info-edit-row input[name="name"] { flex: 1 1 40%; }
+.chapter-info-edit-row input[name="translation"] { flex: 1 1 40%; }
+.chapter-info-edit-row input[type="color"] {
+  width: 28px; height: 28px; padding: 0; border: 1px solid var(--border); background: none; cursor: pointer;
+}
+.chapter-info-edit-row .chapter-info-edit-color-reset,
+.chapter-info-edit-row .chapter-info-edit-delete {
+  font-size: 12px; color: var(--text-dim); background: transparent; border: 1px solid var(--border);
+  padding: 3px 7px; cursor: pointer; border-radius: 4px; white-space: nowrap;
+}
+.chapter-info-edit-row .chapter-info-edit-delete:hover { color: #e63946; border-color: #e63946; }
+.chapter-info-edit-add-row { display: flex; gap: var(--space-2); }
+.chapter-info-edit-add-row button {
+  font-family: 'Golos Text'; font-size: 13px; font-weight: 600;
+  padding: 4px var(--space-3); background: var(--text); color: var(--bg); border: none; cursor: pointer;
+}
+
+/* ── Постраничный режим (см. reader.js::setReadingMode) — вместо ленты
+   все страницы подряд по вертикали, тут видны только .webtoon-page.active
+   (может быть НЕСКОЛЬКО разом — см. ниже про тайлы), вписанные в экран по
+   ВЫСОТЕ (а не по ширине, как в ленте). Высота контейнера — просто 100vh,
+   не "минус шапка": шапка (.nav) в ридере position:fixed поверх всего
+   (см. .reader-body .nav выше) и на .webtoon никак не давит, лежит
+   отдельным слоем сверху — весь этот файл раньше высчитывал реальную
+   высоту шапки в CSS-переменную именно чтобы вычитать её отсюда, с fixed
+   шапкой в этом больше нет смысла.
+
+   Одна "логическая" страница иногда на самом деле несколько строк pages
+   (см. ParentID в chapter.go — очень высокие вебтун-картинки при заливке
+   режутся на тайлы). Их .webtoon-page получают .active ВСЕ разом (см.
+   showHorizontalPage в reader.js) и должны выглядеть одной непрерывной
+   картинкой без шва — поэтому тут flex-direction:column (не row, как
+   можно ожидать от обычного "отцентровать один элемент"): при нескольких
+   активных тайлах row положил бы их рядом по горизонтали, а не друг под
+   другом. Точные width/height каждого тайла считает JS (layoutHorizontalGroup)
+   от их РЕАЛЬНЫХ пропорций (page.width/height из базы, общих у всех
+   тайлов одной картинки) так, чтобы сумма высот тайлов ровно совпала с
+   высотой контейнера — img ниже только запасной вариант на случай, если
+   JS почему-то ещё не успел посчитать (например, самый первый кадр). ── */
+body.reading-horizontal .webtoon {
+  max-width: none;
+  height: 100vh; padding-top: 0; /* отступ под шапку — только для ленты, см. .webtoon выше */
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  overflow: hidden;
+  cursor: pointer; /* клик слева/справа — назад/вперёд, см. reader.js */
+}
+/* Высокая страница (см. layoutHorizontalGroup в reader.js): вписана по
+   ширине и длиннее экрана — прижимаем к верху (при center лишнее обрезалось
+   бы и сверху, и снизу, а прокручивать надо от верха вниз) и не даём флексу
+   сжимать тайлы. Листается программно (scrollTop), overflow остаётся hidden. */
+body.reading-horizontal .webtoon.h-tall { justify-content: flex-start; }
+body.reading-horizontal .webtoon.h-tall .webtoon-page { flex-shrink: 0; }
+body.reading-horizontal .webtoon-page { display: none; }
+body.reading-horizontal .webtoon-page.active { display: block; }
+body.reading-horizontal .webtoon-page img { width: auto; max-height: 100%; max-width: 100%; display: block; }
+/* В режиме редактирования курсор снова обычный — тут не листают клики,
+   а тащат/крутят облачки (см. bubbleMouseDown в reader.js). */
+body.reading-horizontal.edit-mode .webtoon { cursor: default; }
+/* Шапка прячется — в ленте при скролле вниз, в постраничном при тапе по
+   краю/центру (см. setNavHidden в reader.js). Просто display:none —
+   .nav тут и так position:fixed (см. выше), ничего пересчитывать не
+   нужно, она не занимает место в потоке ни видимая, ни спрятанная. */
+.nav.reader-nav-hidden { display: none; }
+
+/* Облачок перевода — позиция/размер выставляются инлайново в JS (см.
+   placeBubble в reader.js), в проценты исходного изображения переводить
+   не нужно: координаты уже посчитаны под текущий отображаемый размер. */
+.bubble {
+  position: absolute; display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,var(--bubble-opacity, .97));
+  border: 1.5px solid rgba(0,0,0,.5); border-radius: 8px;
+  padding: 2px; box-sizing: border-box;
+  /* Без overflow:hidden — иначе он же клипует .bubble-resizer/.bubble-
+     rotator (см. ниже), которые НАРОЧНО стоят чуть ЗА пределами рамки
+     (right:-6px и т.п.): с overflow:hidden они не просто невидимы, а ещё
+     и не кликабельны (то, что не рисуется, не участвует в hit-test), из-
+     за чего mousedown всегда попадал на сам .bubble, а не на ручку — и
+     весь драг шёл только в режим "подвинуть", ресайз/поворот не запускались
+     вообще. Клипать содержимое не нужно и без этого: .bubble-text-img
+     сама вписывается в размер через object-fit:contain, а
+     .bubble-text-draft клипует себя сама (см. её собственный overflow ниже). */
+  /* z-index — по прямой просьбе "чтобы одна сторона облачка была в одной
+     картинке, другая в другой": .webtoon-page — просто position:relative
+     БЕЗ z-index (см. правило там же), значит своего стек-контекста не
+     создаёт, и .bubble (тоже без z-index) технически и без этого уже
+     красится поверх ЛЮБОГО <img> (позиционированные элементы всегда
+     красятся после непозиционированных во всём документе разом, а не
+     только в пределах своего родителя — редкое, но стандартное правило
+     CSS2.1). Прописано явно, а не оставлено на этом неявном правиле — то,
+     что должно оставаться такого поведения, уже не должно молча
+     сломаться о будущий transform/opacity/filter/will-change на
+     .webtoon-page (любое из них создаёт свой стек-контекст и заперло бы
+     облачко только в пределах его собственной страницы). */
+  z-index: 1;
+}
+.bubble.no-border { border-color: transparent; }
+/* "Скрыть облачка" (см. chk-hide-bubbles в reader.js) — visibility, не
+   display:none: одним свойством и не рисуется, и не участвует в hit-test
+   (клики проходят насквозь), а место в потоке всё равно не занимало —
+   .bubble и так position:absolute. */
+.bubble.is-hidden { visibility: hidden; }
+/* Сам текст — картинка (см. blocktext.go/getBlockTextImage), не живой
+   HTML: .bubble тут только фон+рамка ("бумага" пузыря), а .bubble-text-img
+   заполняет её целиком. object-fit:contain — PNG супер-семплирован (x3,
+   см. blockImageScale) под чёткость на ретине/зуме, а на экране должен
+   показываться вписанным ровно в размер блока, не в своём натуральном
+   (втрое большем) размере. */
+.bubble-text-img { width: 100%; height: 100%; object-fit: contain; }
+/* .bubble-patch-img — "заплатка" (см. blockpatch.go/getBlockPatchImage),
+   сплошная заливка сэмплированным цветом фона поверх ОРИГИНАЛЬНОГО (не
+   стёртого) текста под переводом — первым слоем внутри .bubble, ДО
+   .bubble-text-img/.bubble-text-draft (см. порядок appendChild в
+   renderBubble в reader.js). border-radius — тот же, что у .bubble: сама
+   заливка не наследует его от родителя (.bubble без overflow:hidden, см.
+   комментарий выше про ресайзер/поворот), скруглять нужно у самой
+   картинки отдельно. object-fit:cover — заливка должна закрыть блок
+   целиком, а не вписаться с полями, как текст. position:absolute —
+   .bubble-text-draft (черновой textContent, не картинка) в потоке рядом
+   не должен сдвигаться из-за неё. */
+.bubble-patch-img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; border-radius: 8px; z-index: -1;
+}
+
+/* ── Режим редактирования (см. editblocks.go/reader.js) ── */
+body.edit-mode .bubble { cursor: move; }
+.bubble.selected { border-color: var(--accent); border-width: 2px; z-index: 20; }
+/* Ручки показываются только у выбранного облачка (см. selectBubble() в
+   reader.js, лениво создаёт/убирает их) — не у всех сразу, иначе на
+   странице с десятком облачков это заметно лишних узлов и слушателей,
+   даже там, где их никто не трогает. Цвет — тот же --accent, что и
+   везде на сайте, не отдельный синий: раньше был перенесён как есть с
+   8080, там он свой (там и цвет самого сайта другой). */
+.bubble-resizer {
+  position: absolute; right: -6px; bottom: -6px; width: 14px; height: 14px;
+  background: var(--accent); border: 2px solid #fff; border-radius: 50%;
+  cursor: nwse-resize;
+}
+.bubble-rotator {
+  position: absolute; left: 50%; top: -26px; width: 12px; height: 12px;
+  transform: translateX(-50%); background: var(--accent); border: 2px solid #fff;
+  border-radius: 50%; cursor: grab;
+}
+.bubble-rotator::before {
+  content: ''; position: absolute; left: 50%; top: 100%; width: 1px; height: 14px;
+  background: var(--accent); transform: translateX(-50%);
+}
+/* Деформация по 4 углам (перспектива, см. cornerPinTransform в reader.js) —
+   квадратные, не круглые, чтобы визуально не путать с .bubble-resizer/
+   .bubble-rotator (те двигают/тянут ВЕСЬ прямоугольник, эти — только свой
+   угол). Позиции — ровно 4 угла НЕТРАНСФОРМИРОВАННОГО бокса блока: если у
+   блока уже есть деформация, та же CSS-трансформация родителя automatически
+   сдвинет и эти ручки к текущему (уже искажённому) углу, отдельно считать
+   их экранную позицию не нужно (см. коммент в selectBubble). */
+.bubble-corner {
+  position: absolute; width: 12px; height: 12px;
+  background: var(--accent); border: 2px solid #fff;
+  cursor: crosshair; z-index: 21;
+}
+.bubble-corner[data-corner="0"] { left: -6px; top: -6px; }
+.bubble-corner[data-corner="1"] { right: -6px; top: -6px; }
+.bubble-corner[data-corner="2"] { right: -6px; bottom: -6px; }
+.bubble-corner[data-corner="3"] { left: -6px; bottom: -6px; }
+/* Середины сторон — обычное растягивание по одной оси (см. dragMoveAt в
+   reader.js), без перекоса — визуально отличаются от .bubble-corner
+   (круглые, не квадратные, поменьше — угловые важнее, не должны теряться
+   среди них). */
+.bubble-edge-resizer {
+  position: absolute; width: 10px; height: 10px;
+  background: var(--accent); border: 2px solid #fff; border-radius: 50%;
+  z-index: 21;
+}
+.bubble-edge-resizer[data-side="top"] { left: 50%; top: -5px; transform: translateX(-50%); cursor: ns-resize; }
+.bubble-edge-resizer[data-side="bottom"] { left: 50%; bottom: -5px; transform: translateX(-50%); cursor: ns-resize; }
+.bubble-edge-resizer[data-side="left"] { left: -5px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+.bubble-edge-resizer[data-side="right"] { right: -5px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+/* Моё же pending-предложение (см. block_proposals/editblocks.go) — рамку
+   отдельным цветом не красим (только .selected синяя, см. выше) и
+   никакой подписи не показываем — единственный видимый эффект: на
+   удаление предлагается притушенным, чтобы было ясно, что сейчас
+   исчезнет после подтверждения. Видно только автору (только его
+   собственные предложения и накладываются, см. myProposals в reader.js),
+   другим читателям в это время показывается оригинал. */
+.bubble.proposal-delete { opacity: .45; }
+.bubble-text-draft {
+  /* Черновик текстом, не картинкой — готовой /block-text/{id}.png с ЕЩЁ
+     не подтверждённым текстом просто не существует (см. renderBubble).
+     Не пытаемся повторить серверный подбор размера шрифта — это только
+     превью для автора, а не то, что увидят читатели. */
+  font-family: 'Golos Text'; font-weight: 700; font-size: 11px; line-height: 1.2;
+  color: #111; text-align: center; overflow: hidden;
+}
+
+/* ── Модерация (/moderation) — см. moderation.go, доступ только владельцу
+   (ownerEmail), сама страница это не проверяет — 403 от /api/moderation/*
+   и всё, см. её собственный JS. Список карточек-предложений, ничего
+   изощрённого — это внутренний инструмент на один email, не публичный UI. */
+.mod-title { font-family: 'Unbounded'; font-weight: 700; font-size: 22px; margin: var(--space-6) 0 var(--space-4); }
+.mod-card {
+  background: var(--surface); border: 1px solid var(--border);
+  padding: var(--space-4); margin-bottom: var(--space-3);
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
+}
+.mod-card-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-2); }
+.mod-card-manga { font-weight: 700; }
+.mod-card-chapter { font-size: 13px; color: var(--text-dim); }
+.mod-card-link { margin-left: auto; font-size: 13px; color: var(--accent-bright); }
+.mod-card-action { font-size: 13px; color: var(--text-dim); margin-bottom: var(--space-2); }
+.mod-card-author { font-weight: 600; color: var(--text); }
+.mod-card-before, .mod-card-after { font-size: 14px; margin-bottom: var(--space-1); }
+.mod-card-before { color: var(--text-dim); text-decoration: line-through; }
+.mod-card-geom { font-size: 12px; color: var(--text-dim); font-family: monospace; margin-bottom: var(--space-2); }
+
+/* ── Ручной перевод (/admin/translate) — см. admintranslate.go, тот же
+   guard (ownerEmail), тот же принцип карточек, что и у /moderation выше.
+   Плюс детальный вид одной главы: две копируемые "простыни" (system
+   prompt + собранный batch-текст — буквально то, что раньше уходило в
+   LLM, см. admin_translate_cli.py) и textarea для вставки ответа обратно. */
+.admtr-card {
+  background: var(--surface); border: 1px solid var(--border);
+  padding: var(--space-4); margin-bottom: var(--space-3);
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
+  cursor: pointer;
+}
+.admtr-card-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-2); }
+.admtr-card-manga { font-weight: 700; }
+.admtr-card-chapter { font-size: 13px; color: var(--text-dim); }
+.admtr-card-progress { margin-left: auto; font-size: 13px; color: var(--accent-bright); }
+
+.admtr-back { display: inline-block; margin-bottom: var(--space-4); font-size: 13px; color: var(--accent-bright); cursor: pointer; }
+.admtr-detail-head { margin-bottom: var(--space-4); }
+.admtr-detail-title { font-weight: 700; font-size: 18px; }
+.admtr-detail-sub { font-size: 13px; color: var(--text-dim); margin-top: var(--space-1); }
+
+/* Разрушительное действие (стирает уже распознанное и переведённое в
+   текущем батче) — нарочно НЕ в цвет accent-bright, как обычные кнопки
+   этой страницы, чтобы взгляд отличал "скопировать"/"применить" от
+   "стереть и начать заново" ещё до чтения подписи. */
+.admtr-restart-btn {
+  font-family: 'Golos Text'; font-weight: 600; font-size: 12px;
+  background: transparent; color: var(--text-dim); border: 1px solid var(--border);
+  padding: 5px 12px; cursor: pointer; margin-top: var(--space-2);
+}
+.admtr-restart-btn:hover, .admtr-restart-btn:active { color: var(--text); border-color: var(--text-dim); }
+
+.admtr-block { margin-bottom: var(--space-5); }
+.admtr-block-label { display: flex; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-2); }
+.admtr-block-label b { font-size: 14px; }
+.admtr-copy-btn, .admtr-submit-btn {
+  font-family: 'Golos Text'; font-weight: 600; font-size: 13px;
+  background: var(--accent-bright); color: #fff; border: none;
+  padding: 6px 14px; cursor: pointer;
+}
+.admtr-copy-btn:active, .admtr-submit-btn:active { opacity: .8; }
+.admtr-copy-btn.copied { background: var(--text-dim); }
+.admtr-textarea {
+  width: 100%; box-sizing: border-box; min-height: 160px; resize: vertical;
+  background: var(--bg); color: var(--text); border: 1px solid var(--border);
+  font-family: monospace; font-size: 12px; padding: var(--space-3);
+}
+.admtr-paste-textarea { min-height: 220px; }
+.admtr-result { margin-top: var(--space-3); font-size: 13px; white-space: pre-wrap; }
+.admtr-result.ok { color: var(--text); }
+.admtr-result.err { color: var(--accent-bright); }
+
+/* ══════════════ Тач-цели покрупнее — специально в самом конце файла, не
+   рядом с .account-toggle-frame, где это правило раньше и лежало. Там
+   оно однажды уже переставало работать именно для .reader-icon-btn: при
+   ОДИНАКОВОЙ специфичности выигрывает более позднее по тексту файла
+   правило, а не то, что внутри @media — а собственное определение
+   .reader-icon-btn (в разделе "Ридер") шло в файле позже этого блока,
+   поэтому безусловные 36px из него перебивали условные 40px отсюда даже
+   на устройстве, где hover:none совпадало. Что дальше в файле, то и
+   главнее при прочих равных — поэтому все подобные "бонусы для тача"
+   держим здесь, после всех обычных правил, а не раскиданными по местам,
+   где случайно описан сам компонент. ══════════════ */
+@media (hover: none) {
+  .account-toggle-frame, .reader-icon-btn { width: 40px; height: 40px; }
+  /* .chapter-toggle — не квадрат фиксированного размера (текст+иконка,
+     ширина по содержимому), высота у него не своим width/height, а
+     паддингом .chapter-toggle-inner — поэтому на тач-экране рядом с
+     40px-квадратами (.reader-icon-btn) он оставался ниже их (~34px) и
+     смотрелся мельче. min-height 38px + 1px рамки с обеих сторон снаружи
+     (.chapter-toggle) даёт те же 40px по высоте, что и у квадратных кнопок. */
+  .chapter-toggle-inner { min-height: 38px; }
+}
+
+
+/* ── Ластик очищенного слоя (см. eraser в reader.js, cleanpage.go) ── */
+.reader-eraser-btn.is-on { background: var(--accent-bright); }
+/* Пока ластик включён: облачка не перехватывают мышь (иначе кисть тащила бы
+   их), страница — с прицелом и без прокрутки жестом по ней (touch-action). */
+body.eraser-on .bubble { pointer-events: none; }
+body.eraser-on .webtoon-page.has-clean { cursor: crosshair; touch-action: none; user-select: none; }
+/* Редактируемая страница: настоящий <img.page-clean> прячем, вместо него —
+   canvas редактора ровно по размеру страницы (тот же слой, но с живыми правками). */
+.webtoon-page.eraser-editing img.page-clean { visibility: hidden; }
+.webtoon-page canvas.page-clean-edit {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 0;
+  pointer-events: none; display: block;
+}
+.eraser-bar {
+  position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 120;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center;
+  max-width: calc(100vw - 20px); box-sizing: border-box;
+  padding: 8px 12px; background: var(--surface); border: 1px solid var(--border);
+  box-shadow: 0 4px 18px rgba(0,0,0,.25);
+  font-family: 'Golos Text'; font-size: 13px; color: var(--text);
+}
+.eraser-bar[hidden] { display: none; }
+.eraser-seg { display: flex; }
+.eraser-mode, .eraser-act {
+  font-family: 'Golos Text'; font-weight: 600; font-size: 13px; cursor: pointer;
+  padding: 5px 11px; background: var(--surface2); color: var(--text); border: 1px solid var(--border);
+}
+.eraser-mode + .eraser-mode { border-left: none; }
+.eraser-mode.is-on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.eraser-act:disabled { opacity: .35; cursor: default; }
+.eraser-act:not(:disabled):hover { background: var(--accent-bright); color: #fff; }
+.eraser-done { background: var(--accent); color: #fff; border-color: var(--accent); }
+.eraser-size input { width: 110px; accent-color: var(--accent); vertical-align: middle; }
+.eraser-status { color: var(--text-dim); min-width: 110px; }
+/* Кружок кисти под курсором — реальный размер кисти на экране. */
+.eraser-cursor {
+  position: fixed; z-index: 119; pointer-events: none; border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,.95); box-shadow: 0 0 0 1px rgba(0,0,0,.7);
+  transform: translate(-50%, -50%);
+}
+.eraser-cursor[hidden] { display: none; }
+
+/* ── Кисть (см. paint в reader.js, paintlayer.go) ── */
+.reader-paint-btn.is-on { background: var(--accent-bright); }
+body.paint-on .bubble { pointer-events: none; }
+body.paint-on .webtoon-page { cursor: crosshair; touch-action: none; user-select: none; }
+body.paint-picking .webtoon-page { cursor: copy; }
+.webtoon-page img.page-paint,
+.webtoon-page canvas.page-paint-edit {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+  max-width: none; max-height: none; pointer-events: none; z-index: 0; display: block;
+}
+.webtoon-page.paint-editing img.page-paint { visibility: hidden; }
+.paint-color input { width: 34px; height: 30px; padding: 0; border: 1px solid var(--border); background: none; cursor: pointer; vertical-align: middle; }
+#paint-pick.is-on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.admtr-prev-head { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+
+/* ── Пол говорящего (blockgender.go, кнопки в reader.js): подсветка в редакторе ── */
+body.edit-mode .bubble.g-m { outline: 3px solid rgba(50, 120, 230, .95); background-color: rgba(50, 120, 230, .22) !important; }
+body.edit-mode .bubble.g-f { outline: 3px solid rgba(235, 90, 160, .95); background-color: rgba(235, 90, 160, .22) !important; }
+body.edit-mode .bubble.g-n { outline: 3px solid rgba(240, 190, 30, .95); background-color: rgba(240, 190, 30, .25) !important; }
+.reader-gender { display: flex; gap: 6px; }
+.reader-gender[hidden] { display: none; }
+.reader-gender-btn {
+  width: 34px; height: 34px; border: 2px solid transparent; color: #fff; font: 700 15px 'Golos Text', sans-serif;
+  cursor: pointer; padding: 0;
+}
+.reader-gender-btn.g-m { background: #3278e6; }
+.reader-gender-btn.g-f { background: #eb5aa0; }
+.reader-gender-btn.g-n { background: #f0be1e; color: #222; }
+.reader-gender-btn.is-on { border-color: #111; box-shadow: 0 0 0 2px #fff inset; }
+
+/* ── «Перегенерить» после смены пола (см. regen в reader.js / blockgender.go) ── */
+.reader-regen-btn { width: auto !important; padding: 0 12px; font: 700 13px 'Golos Text', sans-serif; color: #fff; white-space: nowrap; }
+.reader-regen-btn[hidden] { display: none; }
+.reader-regen-btn:disabled { opacity: .45; cursor: default; }
+body.edit-mode .bubble.regen { box-shadow: 0 0 0 4px rgba(220, 40, 40, .9), 0 0 14px 4px rgba(220, 40, 40, .55); }
+.regen-box { width: min(760px, calc(100vw - 32px)); }
+.regen-sub { font-size: 13px; color: var(--text-dim); margin: 0 0 var(--space-3); }
+.regen-row { display: flex; align-items: center; gap: var(--space-3); margin: var(--space-3) 0 var(--space-2); }
+.regen-area {
+  width: 100%; box-sizing: border-box; min-height: 130px; max-height: 32vh; resize: vertical;
+  background: var(--bg); color: var(--text); border: 1px solid var(--border);
+  font-family: monospace; font-size: 12px; padding: var(--space-2) var(--space-3);
+}
+.regen-result { margin-top: var(--space-3); font-size: 13px; white-space: pre-wrap; max-height: 20vh; overflow: auto; }
+.regen-result.ok { color: #2fb344; } .regen-result.err { color: #e5484d; }

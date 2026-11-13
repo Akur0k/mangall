@@ -1,0 +1,134 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="site.css"><title>Проверка MangaLib · MangALL</title>
+<style>
+main{max-width:860px}
+h1{font-size:22px;margin:24px 0 8px}
+.bar{height:10px;background:var(--line);margin:16px 0}.bar i{display:block;height:100%;width:0;background:var(--acc);transition:width .3s}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{padding:8px 14px}
+#log{margin-top:16px;font:12px/1.5 ui-monospace,monospace;max-height:55vh;overflow:auto;background:var(--card);border:1px solid var(--line);padding:8px}
+#log .ok{color:#2a7}#log .no{color:var(--mut,#888)}#log .err{color:#c33}
+</style></head><body>
+<header class="snav"><a class="logo" href="./">MangALL</a></header>
+<main>
+<h1>Проверка MangaLib</h1>
+<p class="mut">Проверяет на MangaLib мангу из рекомендаций, которой нет на readmanga, Senkuro и seimanga.
+  По одному запросу, с паузой. Работает, пока страница открыта; закрыл — потом продолжит с того же места.
+  Нужен запущенный relay (node relay.js).</p>
+<div class="row"><button class="btn go" id="start">Начать</button><button class="btn" id="stop" disabled>Пауза</button>
+  <span id="stat" class="mut"></span></div>
+<div class="bar"><i id="bar"></i></div>
+<div id="log"></div>
+</main>
+<script>
+const RELAY = new URLSearchParams(location.search).get('relay') || 'http://localhost:3000', ML_API = 'https://api.cdnlibs.org/api', PAUSE = 400;
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const log = (t, cls) => { const d = document.createElement('div'); d.className = cls || ''; d.textContent = t; $('log').prepend(d); while ($('log').children.length > 400) $('log').lastChild.remove(); };
+
+// --- сверка названий: те же правила, что у relay ---
+const norm = t => String(t || '').toLowerCase().replace(/ё/g, 'е').replace(/[^a-zа-я0-9]+/g, '');
+const loose = t => String(t || '').toLowerCase().replace(/\bwo\b/g, 'o').replace(/l/g, 'r').replace(/ou/g, 'o').replace(/[^a-z0-9]+/g, '').replace(/([a-z])\1+/g, '$1');
+const SIDE = /антолог|додзинс|энциклопед|спин-?офф|гайден|anthology|doujin|encyclopedia|spin-?off|side ?story|gaiden|\bdj\b|\bnot!?$/i;
+function matcher(it) {
+  const all = [it.q, it.alt, ...it.names].filter(Boolean);
+  const want = all.map(norm).filter(Boolean);
+  const latin = want.filter(n => /[a-z]/.test(n) && !/[а-я]/.test(n));
+  const wantLoose = all.map(loose).filter(n => n.length >= 12);
+  const djOk = /(^|\s)dj(\s|$)/i.test(all.join(' '));
+  const siteNames = x => [x.rus_name, x.eng_name, x.name].filter(Boolean);
+  const year = x => +((String(x.releaseDateString || '').match(/\d{4}/) || [])[0] || 0);
+  function how(x) {
+    const ns = siteNames(x).map(norm);
+    if (ns.some(n => latin.includes(n))) return 'latin';
+    if (siteNames(x).some(n => wantLoose.includes(loose(n)))) return 'loose';
+    if (!ns.some(n => want.includes(n))) return null;
+    const ruLong = ns.some(n => want.includes(n) && /[а-я]/.test(n) && n.length >= 15);
+    const siteLatin = ns.filter(n => /[a-z]/.test(n) && !/[а-я]/.test(n));
+    if (latin.length && siteLatin.length && !ruLong) return null;   // однофамилец по русскому названию
+    return 'ru';
+  }
+  return function pick(list, mode) {
+    if (mode === 'exact') {
+      const rank = { latin: 3, loose: 2, ru: 1 };
+      let ex = list.filter(x => djOk || !SIDE.test(siteNames(x).join(' ')))
+        .map(x => ({ x, h: how(x) })).filter(e => e.h)
+        .map(e => ({ ...e, r: rank[e.h], n: siteNames(e.x).map(norm).filter(n => want.includes(n)).length }));
+      // короткое общее название — год выпуска не должен расходиться больше чем на год
+      ex = ex.filter(e => {
+        const m = siteNames(e.x).map(norm).filter(n => want.includes(n));
+        if (!it.year || e.h === 'loose' || m.some(n => n.length > 10)) return true;
+        const y = year(e.x); return !y || Math.abs(y - it.year) <= 1;
+      }).sort((a, b) => b.r - a.r || b.n - a.n);
+      if (!ex.length) return null;
+      const [a1, a2] = ex;
+      if (a2 && a2.r === a1.r && a2.n === a1.n && a2.x.slug_url !== a1.x.slug_url) return null;   // ничья — не угадываем
+      return { x: a1.x, how: a1.h };
+    }
+    const longLatin = latin.filter(w => w.length >= 12);
+    const pre = list.filter(x => !SIDE.test(siteNames(x).join(' ')) && siteNames(x).map(norm).some(n => longLatin.some(w => n !== w && n.startsWith(w))));
+    return pre.length === 1 ? { x: pre[0], how: 'prefix' } : null;
+  };
+}
+
+// --- запросы ---
+let lastCall = 0;
+async function mlSearch(term) {
+  const wait = lastCall + PAUSE - Date.now(); if (wait > 0) await sleep(wait);
+  for (let attempt = 0; ; attempt++) {
+    lastCall = Date.now();
+    const r = await fetch(ML_API + '/manga?q=' + encodeURIComponent(term) + '&site_id[]=1', { headers: { 'Site-Id': '1' } });
+    if (r.status === 429 || r.status >= 500) {                       // сайт просит притормозить
+      if (attempt >= 5) throw new Error('MangaLib ' + r.status);
+      log(`MangaLib ${r.status} — пауза ${15 * (attempt + 1)} с`, 'err'); await sleep(15000 * (attempt + 1)); continue;
+    }
+    if (!r.ok) throw new Error('MangaLib ' + r.status);
+    return (await r.json()).data || [];
+  }
+}
+async function check(it) {
+  const pick = matcher(it);
+  const terms = [...new Set([it.q, it.alt, ...it.names.filter(n => /[a-zа-я]/i.test(n)).slice(0, 2)].filter(Boolean))];
+  const seen = new Map();
+  // только точные совпадения: поиск MangaLib не отдаёт альтернативных названий, и «название
+  // начинается с нашего» здесь в пробе давало чужие манги (сборники, похожие названия)
+  for (const mode of ['exact'])
+    for (const t of terms) {
+      if (!seen.has(t)) seen.set(t, await mlSearch(t));
+      const h = pick(seen.get(t), mode);
+      if (h) return { title: h.x.rus_name || h.x.eng_name || h.x.name, manga: 'https://mangalib.me/ru/' + h.x.slug_url, how: h.how };
+    }
+  return null;
+}
+
+// --- прогон ---
+let running = false;
+$('stop').onclick = () => { running = false; $('stop').disabled = true; };
+$('start').onclick = async () => {
+  running = true; $('start').disabled = true; $('stop').disabled = false;
+  let items;
+  try { items = await (await fetch(RELAY + '/misses')).json(); }
+  catch (e) { log('relay не отвечает — запусти node relay.js', 'err'); $('start').disabled = false; return; }
+  const total = items.length; let done = 0, found = 0, buf = [];
+  const flush = async () => { if (!buf.length) return; const b = buf; buf = [];
+    await fetch(RELAY + '/ml-set', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }); };
+  const t0 = Date.now();
+  log(`к проверке: ${total}`);
+  for (const it of items) {
+    if (!running) break;
+    try {
+      const v = await check(it);
+      buf.push({ key: it.key, value: v }); done++;
+      if (v) { found++; log(`✓ ${it.q} → ${v.title} (${v.how})`, 'ok'); } else log(`· ${it.q}`, 'no');
+    } catch (e) { log(`! ${it.q}: ${e.message}`, 'err'); running = false; break; }
+    if (buf.length >= 20) await flush();
+    const left = (Date.now() - t0) / done * (total - done) / 60000;
+    $('stat').textContent = `${done} / ${total}, найдено ${found} — осталось ~${left.toFixed(0)} мин`;
+    $('bar').style.width = (100 * done / total) + '%';
+  }
+  await flush();
+  log(running ? `готово: найдено ${found} из ${done}` : `пауза: проверено ${done}, найдено ${found}`);
+  running = false; $('start').disabled = false; $('stop').disabled = true;
+};
+</script>
+</body></html>

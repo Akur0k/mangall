@@ -1,0 +1,83 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;600;700&family=Russo+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css"><title>Поиск по картинке · MangALL</title>
+<style>
+main{max-width:720px}
+h1{font-size:22px;margin:24px 0 8px}
+.drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:220px;padding:24px;
+  border:2px dashed var(--line);background:var(--card);text-align:center;cursor:pointer;transition:border-color .15s,background-color .15s}
+.drop.over{border-color:var(--acc);background:var(--s2)}
+.drop img{max-width:100%;max-height:320px;display:block}
+.drop .hint{color:var(--mut,#888);font-size:14px}
+.row{display:flex;gap:8px;margin-top:16px}
+.row input{flex:1;min-width:0;padding:10px 12px;background:var(--s2);border:1px solid var(--line);color:var(--fg);font:inherit}
+.btn.go{padding:10px 16px}
+.msg{margin-top:12px;font-size:14px;color:var(--mut,#888);min-height:1.4em}
+.alt{font-size:13px;margin-top:24px}.alt a{color:var(--acc)}
+</style></head><body>
+<header class="snav"><a class="logo" href="./">MangALL</a></header>
+<main>
+<h1>Найти мангу по картинке</h1>
+<p class="mut">Перетащи картинку сюда, выбери файл или вставь из буфера (Ctrl+V) — откроется Google Lens в новой вкладке.</p>
+
+<!-- Файл уходит обычной формой прямо в Google Lens (без нашего сервера) -->
+<form id="up" action="https://lens.google.com/v3/upload" method="POST" enctype="multipart/form-data" target="_blank">
+  <label class="drop" id="drop">
+    <span class="hint" id="dhint">Перетащи картинку или нажми, чтобы выбрать<br>Ctrl+V — вставить из буфера</span>
+    <img id="prev" alt="" hidden>
+    <input type="file" name="encoded_image" id="file" accept="image/*" hidden>
+  </label>
+</form>
+
+<form class="row" id="byurl">
+  <input id="url" type="url" placeholder="…или ссылка на картинку: https://…" autocomplete="off">
+  <button class="btn go">Искать</button>
+</form>
+<div class="msg" id="msg"></div>
+<p class="mut alt">Если Google показал ошибку — скопируй картинку (или вставь её сюда, она останется в буфере),
+  открой <a href="https://images.google.com/" target="_blank" rel="noopener"><b>Google Картинки</b></a> и нажми там Ctrl+V.</p>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const say = t => { $('msg').textContent = t || ''; };
+
+// выбранный/вставленный файл → превью → отправка в Google Lens
+function send(file) {
+  if (!file || !/^image\//.test(file.type)) return say('Это не картинка.');
+  const dt = new DataTransfer(); dt.items.add(file);
+  $('file').files = dt.files;
+  $('prev').src = URL.createObjectURL(file); $('prev').hidden = false; $('dhint').hidden = true;
+  say('Открываю Google Lens…');
+  $('up').submit();
+}
+$('file').onchange = () => send($('file').files[0]);
+const drop = $('drop');
+['dragenter', 'dragover'].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', ev => {
+  const f = [...ev.dataTransfer.files].find(f => f.type.startsWith('image/'));
+  if (f) return send(f);
+  const u = ev.dataTransfer.getData('text/uri-list') || ev.dataTransfer.getData('text/plain');
+  if (u) byUrl(u.trim());
+});
+document.addEventListener('paste', ev => {
+  if (ev.target === $('url')) return;
+  const it = [...ev.clipboardData.items].find(i => i.type.startsWith('image/'));
+  if (it) { ev.preventDefault(); send(it.getAsFile()); }
+});
+
+// по ссылке: Google сам скачивает картинку — работает только для общедоступных ссылок
+function byUrl(u) {
+  if (!/^https?:\/\//i.test(u)) return say('Нужна ссылка вида https://…');
+  if (/^https?:\/\/(localhost|127\.)/i.test(u)) return say('Ссылку на localhost Google не откроет — сохрани картинку и загрузи файлом.');
+  window.open('https://lens.google.com/uploadbyurl?url=' + encodeURIComponent(u), '_blank', 'noopener');
+  say('Открыл Google Lens в новой вкладке.');
+}
+$('byurl').onsubmit = ev => { ev.preventDefault(); byUrl($('url').value.trim()); };
+
+// rm.html может передать ссылку: lens.html?url=…
+const pre = new URLSearchParams(location.search).get('url');
+if (pre) { $('url').value = pre; }
+</script>
+</body></html>
