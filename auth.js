@@ -42,6 +42,7 @@
       accBtn.querySelector('.lbl').textContent = u2 ? (u2.given_name || u2.name || 'Аккаунт') : 'Войти';
       accBtn.title = u2 ? `Вы вошли: ${u2.name} (${u2.email})` : 'Войти через Google';
     }
+    syncAuthItem(u2);
     if (u2) { login.dataset.in = ''; login.querySelector('.me img').src = u2.picture || '';
       login.querySelector('.me span').textContent = `${u2.name} · ${u2.email}`; } else delete login.dataset.in;
     subs.forEach(f => { try { f(u2); } catch (e) { console.error(e); } });
@@ -62,6 +63,13 @@
     setCred(null); login.hidden = true;
   };
   if (accBtn) accBtn.onclick = () => open();
+  // пункт «Войти через Google» в меню аккаунта (есть не на каждой странице — тогда просто нет)
+  const authItem = document.getElementById('auth-item');
+  if (authItem) authItem.onclick = () => open();
+  function syncAuthItem(u2) {
+    const l = document.getElementById('auth-item-label');
+    if (l) l.textContent = u2 ? 'Аккаунт: ' + (u2.given_name || u2.name || u2.email) : 'Войти через Google';
+  }
   document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !login.hidden) { login.hidden = true; afterLogin = null; } });
 
   window.onGoogleLibraryLoad = () => {

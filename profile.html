@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MangALL — Профиль</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="next/style.css">
+<style>
+/* ── Профиль — оформление в духе "Persona 5": рваные диагональные срезы,
+   красно-чёрно-белый контраст, жирная повёрнутая типографика, растровые
+   точки как текстура. Стиль, не чужие ассеты — ни лого, ни текстов игры
+   тут нет, только сама манера (уже и так близкая духу сайта: --accent
+   тут ровно тот же красный, что и в остальном style.css, clip-path-срезы
+   — тот же приём, что у карточек/чипсов/кнопок по всему сайту, просто
+   тут — резче и агрессивнее, под тему страницы). ── */
+
+.profile-page { padding: var(--space-6) 0 var(--space-8); }
+
+/* Хедер-баннер — красная плашка с чёрной диагональной "разрезкой",
+   аватар в скошенной рамке, ник крупно и с наклоном. */
+.profile-hero {
+  position: relative;
+  background: var(--accent);
+  color: #fff;
+  margin: 0 var(--section-pad-x) var(--space-7);
+  padding: var(--space-7) var(--space-6);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 28px), calc(100% - 40px) 100%, 0 100%);
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  isolation: isolate;
+}
+.profile-hero::before {
+  /* Растровые точки поверх красного — та же текстура, что .footer-dots
+     в остальном сайте, просто светлая на красном, не тёмная на фоне. */
+  content: ""; position: absolute; inset: 0; z-index: 0; opacity: .18;
+  background-image: radial-gradient(circle, #000 1.6px, transparent 1.8px);
+  background-size: 14px 14px;
+}
+.profile-hero::after {
+  /* Чёрная диагональная полоса-акцент через весь баннер — фирменный
+     P5-приём "разрез под углом". */
+  content: ""; position: absolute; z-index: 0;
+  top: 0; bottom: 0; left: 62%; width: 90px;
+  background: #000;
+  transform: skewX(-18deg);
+  opacity: .85;
+}
+.profile-hero-avatar-frame {
+  position: relative; z-index: 1; flex: 0 0 auto;
+  width: 104px; height: 104px;
+  background: #000;
+  clip-path: polygon(14% 0, 100% 0, 100% 86%, 86% 100%, 0 100%, 0 14%);
+  padding: 4px;
+}
+.profile-hero-avatar {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  clip-path: polygon(14% 0, 100% 0, 100% 86%, 86% 100%, 0 100%, 0 14%);
+  background: var(--surface2);
+}
+.profile-hero-body { position: relative; z-index: 1; min-width: 0; }
+.profile-hero-tag {
+  display: inline-block;
+  background: #000; color: #fff;
+  font-family: 'Unbounded'; font-weight: 700; font-size: 11px;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: 3px var(--space-3); margin-bottom: var(--space-2);
+  transform: rotate(-2deg) skewX(-10deg);
+  transform-origin: left center;
+}
+.profile-hero-name {
+  font-family: 'Unbounded'; font-weight: 900; font-size: clamp(24px, 4vw, 38px);
+  line-height: 1.05; letter-spacing: -.01em;
+  text-shadow: 3px 3px 0 #000;
+  word-break: break-word;
+}
+.profile-hero-sub {
+  margin-top: var(--space-2); font-size: 13px; opacity: .9;
+  font-family: 'Golos Text'; font-weight: 500;
+}
+
+/* Статы — мелкие чёрные плашки под углом, вперемешку, как каточки-стата
+   в JRPG-меню. */
+.profile-stats {
+  display: flex; flex-wrap: wrap; gap: var(--space-4);
+  margin: 0 var(--section-pad-x) var(--space-7);
+}
+/* Рамка через срез — clip-path не рисует border вдоль своего же диагонального
+   среза (обычный CSS border тут просто обрезался бы прямо по диагонали,
+   без окантовки), поэтому та же "двухслойная рамка из фона", что и везде
+   на сайте (см. .catalog-pager-btn/-inner в style.css): внешний слой —
+   цвет рамки на всю форму, внутренний — фон карточки, чуть меньше по
+   срезу, за счёт padding в 2px на внешнем видна полоска-"рамка". */
+.profile-stat {
+  background: var(--text);
+  padding: 2px;
+  min-width: 140px;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+}
+.profile-stat-inner {
+  background: var(--surface);
+  padding: var(--space-4) var(--space-5);
+  height: 100%;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+}
+.profile-stat-num {
+  font-family: 'Unbounded'; font-weight: 900; font-size: 28px; color: var(--accent);
+  line-height: 1;
+}
+.profile-stat-label {
+  margin-top: var(--space-1); font-size: 11px; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text-dim); font-weight: 600;
+}
+
+/* Заголовок секции — большая скошенная красная плашка с белым текстом,
+   тот же язык, что и hero. */
+.profile-section-head {
+  margin: var(--space-7) var(--section-pad-x) var(--space-5);
+  display: flex; align-items: center; gap: var(--space-3);
+}
+.profile-section-head:first-child { margin-top: 0; }
+/* Переключатель — несколько .profile-section-title подряд, кликабельные
+   (button, не span), активная вкладка красная, остальные чёрные (гаснут
+   в var(--surface2) при наведении). Сама форма/срез — та же, что и
+   раньше, просто теперь ещё и cursor+transition. */
+.profile-section-title {
+  background: #000; color: #fff;
+  font-family: 'Unbounded'; font-weight: 800; font-size: 15px;
+  text-transform: uppercase; letter-spacing: .04em;
+  padding: var(--space-2) var(--space-5);
+  clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
+  border: none; cursor: pointer;
+  transition: background-color .15s, color .15s;
+  white-space: nowrap;
+}
+.profile-section-title:hover { background: var(--surface2); color: var(--text); }
+.profile-section-title.active { background: var(--accent); color: #fff; }
+.profile-section-line {
+  flex: 1 1 auto; height: 3px; background: var(--accent);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+}
+
+.profile-list { margin: 0 var(--section-pad-x); display: flex; flex-direction: column; gap: var(--space-3); }
+
+.profile-card {
+  position: relative;
+  display: flex; align-items: center; gap: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: var(--space-3) var(--space-4);
+  text-decoration: none; color: inherit;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+  transition: background-color .15s, transform .15s;
+}
+.profile-card:hover { background: var(--surface2); transform: translateX(4px); }
+.profile-card-cover-frame {
+  flex: 0 0 auto; width: 56px; aspect-ratio: 2/3;
+  background: var(--border); padding: 2px;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
+}
+.profile-card-cover-frame img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%);
+  background: var(--surface2);
+}
+.profile-card-body { flex: 1 1 auto; min-width: 0; }
+.profile-card-title {
+  font-family: 'Unbounded'; font-weight: 700; font-size: 14px; line-height: 1.3;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.profile-card-chapter {
+  margin-top: 3px; font-size: 12px; color: var(--text-dim); font-family: 'Golos Text';
+}
+.profile-card-bar-track {
+  margin-top: var(--space-2); height: 6px; background: var(--border);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 5px) 100%, 0 100%);
+  overflow: hidden;
+}
+.profile-card-bar-fill { height: 100%; background: var(--accent); }
+.profile-card-arrow {
+  flex: 0 0 auto; font-family: 'Unbounded'; font-weight: 900; font-size: 18px;
+  color: var(--accent); transform: skewX(-10deg);
+}
+
+.profile-empty {
+  margin: 0 var(--section-pad-x);
+  padding: var(--space-8) var(--space-5); text-align: center;
+  color: var(--text-dim); font-size: 14px;
+  border: 2px dashed var(--border);
+}
+
+/* Плитки коллекции — сеткой, как библиотека игр (обложка на всю карточку,
+   название поверх затемнённого низа), не строкой-списком, как
+   .profile-card/.profile-list выше (те оставлены — вдруг "Продолжить
+   чтение" вернут обратно, см. правку по прямой просьбе). */
+.profile-tile-grid {
+  margin: 0 var(--section-pad-x);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-4);
+}
+/* Обёртка-ссылка — сама плитка (обложка) + название ПОД ней, не поверх
+   (по прямой просьбе "внизу под плиткой а не в плитке"). */
+.profile-tile-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+.profile-tile {
+  position: relative;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  transition: transform .15s;
+  /* Небольшой перекос — верх вправо, низ влево (skewX с отрицательным
+     углом сдвигает именно так: точки выше центра уходят в плюс по X,
+     ниже центра — в минус). */
+  transform: skewX(-4deg);
+  border-top-left-radius: 7px;
+  border-bottom-left-radius: 7px;
+  /* Тень от самой плитки на фон страницы — приподнимает её над фоном
+     (overflow:hidden выше режет содержимое ВНУТРИ плитки, свою же
+     box-shadow снаружи не трогает). */
+  box-shadow: 0 32px 50px -10px rgba(0,0,0,.7);
+}
+.profile-tile-card:hover .profile-tile { transform: skewX(-4deg) translateY(-3px); }
+.profile-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* Тень по краям — картинка (tile-shadow.png), не CSS-градиент, по прямой
+   просьбе наложить именно присланное изображение. multiply — белые/
+   прозрачные места картинки не высветляют обложку, только серая тень
+   по краям её затемняет. */
+.profile-tile-bookshadow {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%; object-fit: fill;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+/* Блик — как на плитках библиотеки Steam: диагональная светлая ПОЛОСА
+   через всю карточку (не гаснущий от угла градиент, как было раньше —
+   тот был еле заметен поверх обложек с картинкой, слишком быстро уходил
+   в прозрачность). Тут — чёткий узкий "блик стекла", наискось снизу-слева
+   вверх-направо. */
+.profile-tile-shine {
+  /* Больше самой карточки (inset -60% — размер ~220% от .profile-tile
+     в каждую сторону), не впритык (inset: 0, как было раньше) — на
+     ховере полоса съезжает и упирается в СВОЙ собственный край
+     (там, где градиент уже погас в прозрачность), из-за чего казалось,
+     что она "обрезается". С запасом по краям смещение всегда остаётся
+     внутри непрозрачной части полосы — обрезает её только clip-path
+     самой .profile-tile (родитель), а не собственные границы блика. */
+  position: absolute; inset: -60%;
+  background: linear-gradient(115deg,
+    rgba(255,255,255,0) 42%,
+    rgba(255,255,255,.55) 47%,
+    rgba(255,255,255,.12) 51%,
+    rgba(255,255,255,0) 56%);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  transform: translate(0, 0);
+  transition: transform .5s ease;
+}
+/* По прямой просьбе "перемещался при наведении" — при ховере полоса
+   съезжает по диагонали дальше (вдоль своего же угла в 115deg), плавно
+   возвращается назад, когда курсор уходит (сам :hover уже даёт обратный
+   переход бесплатно, transition отрабатывает в обе стороны). Проценты
+   тут — доля от УВЕЛИЧЕННОГО (inset -60%) размера самого блика, не от
+   карточки, поэтому меньше, чем можно ожидать (17%/-10% ~ тем же
+   38%/-22% в абсолютных пикселях тайла, что и раньше). */
+.profile-tile-card:hover .profile-tile-shine {
+  transform: translate(17%, -10%);
+}
+/* Название — красный блок-плашка с белым текстом (тот же язык, что у
+   .profile-hero-tag/.profile-section-title выше на странице), срезанный
+   уголок снизу-слева в общем стиле сайта. */
+.profile-tile-title {
+  margin-top: var(--space-3);
+  background: var(--accent);
+  color: #fff;
+  padding: var(--space-2) var(--space-3);
+  font-family: 'Unbounded'; font-weight: 700; font-size: 12px; line-height: 1.35;
+  letter-spacing: -.01em;
+  text-align: center;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+  transition: background-color .15s;
+}
+.profile-tile-card:hover .profile-tile-title { background: var(--accent-bright); }
+
+/* ── Телефон — тот же брейкпоинт (640px), что и у остального сайта (см.
+   style.css). Герой ужимается (меньше паддингов/аватар/зазор, диагональная
+   полоса-акцент прячется — на узком баннере она наезжала бы на текст),
+   вкладки статусов уходят в горизонтальный скролл вместо переноса (их
+   уже пять потенциальных, «Любимое/В планах/Читаю/Прочитано/Брошено» в
+   один ряд на 360px не влезут никак, скролл честнее, чем перенос вкривь). */
+@media (max-width: 640px) {
+  .profile-hero {
+    gap: var(--space-4);
+    padding: var(--space-5) var(--space-4);
+    flex-wrap: wrap;
+  }
+  .profile-hero::after { display: none; }
+  .profile-hero-avatar-frame { width: 72px; height: 72px; }
+  .profile-hero-name { font-size: clamp(20px, 6vw, 28px); }
+  .profile-hero-sub { font-size: 12px; }
+
+  .profile-stats { gap: var(--space-3); margin-bottom: var(--space-5); }
+  .profile-stat { min-width: 0; flex: 1 1 130px; }
+  .profile-stat-num { font-size: 22px; }
+
+  .profile-section-head {
+    margin-top: var(--space-5);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: var(--space-1); /* небольшой зазор под скроллбар, чтобы не липла к тексту */
+  }
+  .profile-section-title { flex: 0 0 auto; font-size: 13px; padding: var(--space-2) var(--space-4); }
+  .profile-section-line { display: none; } /* при скролле у неё всё равно нет фиксированного "остатка ширины", чтобы тянуться */
+
+  .profile-tile-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: var(--space-3); }
+}
+
+  [hidden] { display: none !important; }
+  .profile-guest { padding: 40px 16px; text-align: center; }
+  .profile-guest p { margin: 0 0 16px; font-size: 16px; }
+  .profile-guest-btn { font: 700 14px 'Golos Text', sans-serif; padding: 12px 18px; border: 0; background: #b3261e; color: #fff; cursor: pointer; }
+</style>
+</head>
+<body>
+<header class="nav">
+  <div class="footer-dots" aria-hidden="true"></div>
+  <a href="./" class="logo">MangALL</a>
+  <div class="nav-search-wrap">
+    <div class="nav-search-frame">
+      <div class="nav-search">
+        <span class="icon icon-search"></span>
+        <input type="text" id="nav-search-input" placeholder="Найти мангу..." autocomplete="off">
+      </div>
+    </div>
+    <div class="nav-search-dropdown" id="nav-search-dropdown" hidden></div>
+  </div>
+  <div class="nav-account">
+    <button class="account-toggle-frame" id="account-toggle" aria-label="Меню аккаунта" aria-expanded="false" aria-haspopup="true">
+      <span class="account-toggle">
+        <span class="icon icon-user" id="account-toggle-icon"></span>
+        <!-- Показывается вместо иконки-заглушки, когда человек залогинен
+             — см. initAuth() в common.js. Обрезается тем же уголком, что
+             и вся кнопка (.account-toggle clip-path режет и содержимое,
+             отдельный clip-path на самой картинке не нужен). -->
+        
+      </span>
+    </button>
+    <div class="account-menu-arrow" aria-hidden="true"></div>
+    <div class="account-menu" id="account-menu">
+      <div class="account-menu-dots" aria-hidden="true"></div>
+      <a href="profile.html" class="account-menu-item">
+        <span class="icon icon-user"></span>
+        <span class="account-menu-label">Профиль</span>
+      </a>
+      <button class="account-menu-item" id="auth-item" type="button">
+        <span class="icon icon-user"></span>
+        <span class="account-menu-label" id="auth-item-label">Войти через Google</span>
+      </button>
+      <div class="account-menu-divider"></div>
+      <button class="account-menu-item" id="theme-toggle">
+        <span class="account-menu-icon">
+          <span class="icon icon-sun"></span>
+          <span class="icon icon-moon"></span>
+        </span>
+        <span class="account-menu-label">Тема</span>
+      </button>
+    </div>
+  </div>
+</header>
+<main>
+<section class="section profile-page">
+
+  <div class="profile-guest" id="profile-guest" hidden>
+  <p>Профиль доступен после входа через Google.</p>
+  <button type="button" class="profile-guest-btn" id="profile-login">Войти через Google</button>
+</div>
+<div class="profile-hero" id="profile-content">
+    <div class="profile-hero-avatar-frame">
+      <img class="profile-hero-avatar" id="profile-avatar" src="" alt="">
+    </div>
+    <div class="profile-hero-body">
+      <span class="profile-hero-tag" id="profile-tag">ЧИТАТЕЛЬ</span>
+      <div class="profile-hero-name" id="profile-name">Гость</div>
+    </div>
+  </div>
+
+  <div class="profile-stats">
+    <div class="profile-stat">
+      <div class="profile-stat-inner">
+        <div class="profile-stat-num" id="stat-in-progress">0</div>
+        <div class="profile-stat-label">Читаю сейчас</div>
+      </div>
+    </div>
+    <div class="profile-stat">
+      <div class="profile-stat-inner">
+        <div class="profile-stat-num" id="stat-total-pages">0</div>
+        <div class="profile-stat-label">В коллекции</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- "Продолжить чтение" — убрано по прямой просьбе, пока (не насовсем):
+       см. profile.js — loadProgress() сама секцию больше не рисует
+       (#profile-list в разметке нет), но статы сверху (профиль-stats)
+       по-прежнему считает из того же прогресса, так что данные не потеряны,
+       просто список карточек скрыт. Если понадобится вернуть — раньше
+       здесь стоял .profile-section-head + <div class="profile-list"
+       id="profile-list">, стили те же (.profile-card/.profile-list) ещё
+       в <style> выше, никуда не делись. -->
+
+  <!-- Коллекция — Любимое/В планах/Читаю/Прочитано/Брошено (см.
+       collection.go/manga.js за тем, как статус выставляется на странице
+       тайтла). Требует логина (в отличие от истории чтения выше — та
+       анонимная по браузеру, коллекция привязана к аккаунту, см. комментарий
+       в collection.go) — гостю тут просто пусто, секции не рисуются вообще
+       (см. renderCollection в profile.js). -->
+  <div id="profile-collection-sections"></div>
+
+</section>
+</main>
+<footer class="footer">
+  <div class="footer-dots" aria-hidden="true"></div>
+  <span class="logo footer-logo">MangALL</span>
+  <p>Читай любимую мангу, манхву и маньхуа с переводом от сообщества.</p>
+</footer>
+<script src="next/common.js"></script>
+<script>window.SITE = window.SITE || { root: '', gclient: '457192894158-51mr293gi026t8k3iph3o9i4m57ouo19.apps.googleusercontent.com',
+  api: (location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? 'https://mangall-suggest-dev.nake000071.workers.dev' : 'https://mangall-suggest.nake000071.workers.dev' };</script>
+<script src="auth.js"></script>
+<script src="profile.js"></script>
+</body>
+</html>

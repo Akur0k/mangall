@@ -63,7 +63,7 @@
       id: r[0], title: r[1], score: r[3], pop: r[4],
       // обложка: 230px обычно, 460px — на экранах с высокой плотностью (браузер выбирает сам по srcset)
       // «~N» — обложка манги из нашей базы MangaDex (папка обложек mangall: mdcovers/N.jpg)
-      cover: r[2] ? (r[2][0] === '~' ? S.root + c.mdcover + r[2].slice(1) + '.jpg' : r[2].startsWith('http') ? r[2] : c.cover + 'medium/' + r[2]) : '',
+      cover: r[2] ? (r[2][0] === '~' ? 'https://cdn.jsdelivr.net/gh/Akur0k/mangall-covers@v1/' + r[2].slice(1) + '.webp' : r[2].startsWith('http') ? r[2] : c.cover + 'medium/' + r[2]) : '',
       cover2: r[2] && r[2][0] !== '~' && !r[2].startsWith('http') ? c.cover + 'large/' + r[2] : '',
       year: r[5], fmt: r[6], adult: !!(r[7] & 1), md: !!(r[7] & 4), ours: c.ours[r[0]] || null, g: r[8], t: r[9], alt: r[10] || '',
     });

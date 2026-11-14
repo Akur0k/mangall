@@ -55,7 +55,7 @@
 // на localhost главы, MangaDex и поиск — с Worker mangall-relay (без карты и без включённого компьютера);
 // /title, каталог и остальное — по-прежнему локальный relay
 const WORKER = 'https://mangall-relay.nake000071.workers.dev';
-const RELAY_CH = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? WORKER : null;
+const RELAY_CH = WORKER;   // главы readmanga/MangaDex и поиск — с Worker везде (localhost и mangall.pages.dev)
 const RELAY = (location.hostname === 'localhost' || location.hostname === '127.0.0.1' ? 'http://localhost:3000' : /^(192\.168|10)\./.test(location.hostname) ? location.origin + '/relay' : location.origin + '/api');   // localhost — relay на компьютере; домашняя сеть — через serve.py (/relay/); Cloudflare Pages — облачный API (/api/)
 // с какой манги пришли (title.html добавляет &t=id) — кнопка «назад» ведёт на её страницу
 const FROM_T = /^-?\d+$/.test(new URLSearchParams(location.search).get('t') || '') ? new URLSearchParams(location.search).get('t') : '';
@@ -402,8 +402,6 @@ async function load(u) {
       try {
         const r = await fetch((RELAY_CH || RELAY) + ep + '?u=' + encodeURIComponent(u));
         d = await r.json();
-        // Worker пока не знает seimanga/senkuro — тогда берём локальный relay
-        if (d.error && RELAY_CH) d = await (await fetch(RELAY + ep + '?u=' + encodeURIComponent(u))).json();
         if (d.error) throw new Error(d.error);
       } catch (e) {
         if (!isRMfam(u)) throw e;

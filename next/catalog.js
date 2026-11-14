@@ -151,9 +151,9 @@ async function loadTags() {
 // карточке при рендере (см. loadPage) вычисляется своя явная ячейка —
 // так же надёжно работает и на неполной последней странице (когда число
 // карточек не делится на число колонок ровно), см. комментарий там же.
-let COVER = { base: '', md: 'mdcovers/' };
+let COVER = { base: '', md: 'https://cdn.jsdelivr.net/gh/Akur0k/mangall-covers@v1/' };
 // обложка: AniList — имя файла (CDN AniList), «~N» — из папки обложек нашей базы MangaDex
-const coverURL = c => !c ? '' : c[0] === '~' ? COVER.md + c.slice(1) + '.jpg' : c.startsWith('http') ? c : COVER.base + 'medium/' + c;
+const coverURL = c => !c ? '' : c[0] === '~' ? COVER.md + c.slice(1) + '.webp' : c.startsWith('http') ? c : COVER.base + 'medium/' + c;
 function cardHTML(u, gridRow, gridColumn) {
   const tags = firstGenres(u.genres, 6);
   const cov = coverURL(u.cover);

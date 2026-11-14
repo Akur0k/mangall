@@ -12,6 +12,13 @@
   .manga-chapters + .manga-chapters { margin-top: 24px; }
   .manga-chapters-head h2 small { font: 500 13px 'Golos Text', sans-serif; color: var(--text-dim); margin-left: 8px; }
   .manga-cover-img.is-empty { background: var(--surface2); }
+  .col-bar { position: relative; display: inline-block; margin-top: 12px; }
+  .col-pop { position: absolute; left: 0; top: calc(100% + 8px); min-width: 230px; z-index: 50; padding: 8px 0;
+    background: var(--surface, #fff); border: 1px solid var(--border, #ddd); box-shadow: 0 8px 30px rgba(0,0,0,.25); }
+  .col-item { display: block; width: 100%; text-align: left; font: inherit; padding: 10px 16px; background: none; border: 0; color: inherit; cursor: pointer; }
+  .col-item:hover { background: var(--surface2, #f3f3f3); }
+  .col-item.on { color: var(--accent, #b3261e); font-weight: 700; }
+  .col-div { height: 1px; background: var(--border, #ddd); margin: 6px 12px; }
 </style>
 </head>
 <body>
@@ -42,10 +49,14 @@
     <div class="account-menu-arrow" aria-hidden="true"></div>
     <div class="account-menu" id="account-menu">
       <div class="account-menu-dots" aria-hidden="true"></div>
-      <a href="./#recs-home" class="account-menu-item">
-        <span class="icon icon-star"></span>
-        <span class="account-menu-label">Рекомендации</span>
+      <a href="profile.html" class="account-menu-item">
+        <span class="icon icon-user"></span>
+        <span class="account-menu-label">Профиль</span>
       </a>
+      <button class="account-menu-item" id="auth-item" type="button">
+        <span class="icon icon-user"></span>
+        <span class="account-menu-label" id="auth-item-label">Войти через Google</span>
+      </button>
       <div class="account-menu-divider"></div>
       <button class="account-menu-item" id="theme-toggle">
         <span class="account-menu-icon">
@@ -70,6 +81,18 @@
         <div class="manga-alt-title" id="manga-alt-title" hidden></div>
         <div class="manga-tags" id="manga-tags"></div>
         <div class="manga-badges" id="manga-badges"></div>
+        <div class="col-bar" id="col-bar" hidden>
+          <button type="button" class="catalog-chip" id="col-btn"><span class="catalog-chip-inner"><span id="col-label">В коллекцию</span></span></button>
+          <div class="col-pop" id="col-pop" hidden>
+            <button type="button" class="col-item" data-st="favorite">Любимое</button>
+            <button type="button" class="col-item" data-st="planned">В планах</button>
+            <button type="button" class="col-item" data-st="reading">Читаю</button>
+            <button type="button" class="col-item" data-st="completed">Прочитано</button>
+            <button type="button" class="col-item" data-st="dropped">Брошено</button>
+            <div class="col-div" aria-hidden="true"></div>
+            <button type="button" class="col-item" data-st="">Убрать из коллекции</button>
+          </div>
+        </div>
         <div class="manga-desc" id="manga-desc"></div>
         <button class="manga-desc-toggle" id="manga-desc-toggle" hidden>Показать полностью</button>
       </div>
@@ -102,10 +125,13 @@
 </footer>
 
 <script src="next/common.js"></script>
+<script>window.SITE = window.SITE || { root: '', gclient: '457192894158-51mr293gi026t8k3iph3o9i4m57ouo19.apps.googleusercontent.com',
+  api: (location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? 'https://mangall-suggest-dev.nake000071.workers.dev' : 'https://mangall-suggest.nake000071.workers.dev' };</script>
+<script src="auth.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 // на localhost поиск readmanga и главы — с Worker mangall-relay; /title и /mdch — локальный relay
-const RELAY_CH = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? 'https://mangall-relay.nake000071.workers.dev' : RELAY;
+const RELAY_CH = 'https://mangall-relay.nake000071.workers.dev';   // поиск readmanga и главы — с Worker везде
 const read = u => 'rm.html?u=' + encodeURIComponent(u) + '&t=' + (+new URLSearchParams(location.search).get('id') || '');   // &t — чтобы из читалки вернуться сюда
 
 const STATUS = { ongoing: 'Онгоинг', completed: 'Завершён', hiatus: 'Приостановлен', cancelled: 'Отменён' };
@@ -185,7 +211,6 @@ async function loadRussian(t) {
     $('ru-src').textContent = SRC(url) + ' · русский';
     try {
       let d = await (await fetch(RELAY_CH + '/chapter?u=' + encodeURIComponent(url))).json();
-      if (d.error) d = await (await fetch('http://localhost:3000/chapter?u=' + encodeURIComponent(url))).json();   // seimanga и др. — локальный relay (откат)
       if (d.error) throw new Error(d.error);
       lists.ru = (d.chapters || []).map(ruRow);
       if (!lists.ru.length) lists.ru = [{ url: d.url || url, num: d.chapter ? 'Глава ' + d.chapter : 'Читать', title: '', pages: '' }];
@@ -214,6 +239,48 @@ async function loadEnglish(uuid) {
   }
 }
 
+// --- коллекция (статусы как в mangall-next): вход через Google, данные — Worker mangall-suggest ---
+const COL_LABEL = { favorite: 'Любимое', planned: 'В планах', reading: 'Читаю', completed: 'Прочитано', dropped: 'Брошено' };
+let colState = { mid: 0, status: null, title: '', cover: '' };
+function colRender() {
+  $('col-bar').hidden = false;
+  if (!window.MAuth || !MAuth.user) { $('col-label').textContent = 'В коллекцию (войти)'; return; }
+  $('col-label').textContent = colState.status ? COL_LABEL[colState.status] : 'В коллекцию';
+  $('col-pop').querySelectorAll('[data-st]').forEach(b => b.classList.toggle('on', b.dataset.st === (colState.status || '')));
+}
+async function colLoad() {
+  if (window.MAuth && MAuth.user) {
+    try {
+      const d = await MAuth.api('/collection');
+      const it = d.items.find(x => x.mid === colState.mid);
+      colState.status = it ? it.status : null;
+    } catch (e) { colState.status = null; }
+  } else colState.status = null;
+  colRender();
+}
+async function colSet(st) {
+  if (!MAuth.user) return MAuth.open('Войдите через Google, чтобы добавить тайтл в коллекцию');
+  try {
+    await MAuth.api('/collection', { method: 'PUT', body: { mid: colState.mid, status: st, title: colState.title, cover: colState.cover } });
+    colState.status = st; colRender();
+  } catch (e) { $('col-label').textContent = 'Ошибка: ' + e.message; }
+}
+function setupCollection(id, cover, title) {
+  colState = { mid: id, status: null, title: title || '', cover: cover || '' };
+  if (!window.MAuth) { $('col-bar').hidden = true; return; }
+  $('col-btn').onclick = () => {
+    if (!MAuth.user) return MAuth.open('Войдите через Google, чтобы добавить тайтл в коллекцию');
+    $('col-pop').hidden = !$('col-pop').hidden;
+  };
+  $('col-pop').querySelectorAll('[data-st]').forEach(b => b.onclick = () => { $('col-pop').hidden = true; colSet(b.dataset.st || null); });
+  document.addEventListener('click', e => { if (!e.target.closest('#col-bar')) $('col-pop').hidden = true; });
+  const ai = document.getElementById('auth-item');
+  if (ai) ai.onclick = () => MAuth.open();
+  MAuth.onChange(u => { colLoad(); const l = document.getElementById('auth-item-label'); if (l) l.textContent = u ? 'Аккаунт: ' + (u.given_name || u.name || u.email) : 'Войти через Google'; });
+  colLoad();
+  const l = document.getElementById('auth-item-label'); if (l) l.textContent = MAuth.user ? 'Аккаунт: ' + (MAuth.user.given_name || MAuth.user.name || MAuth.user.email) : 'Войти через Google';
+}
+
 (async function main() {
   const id = +new URLSearchParams(location.search).get('id');
   let t;
@@ -228,7 +295,7 @@ async function loadEnglish(uuid) {
     return;
   }
   document.title = t.title + ' — MangALL';
-  const cov = t.cover ? (t.cover[0] === '~' ? t.mdcover + t.cover.slice(1) + '.jpg' : t.cover.startsWith('http') ? t.cover : t.coverBase + 'large/' + t.cover) : '';
+  const cov = t.cover ? (t.cover[0] === '~' ? t.mdcover + t.cover.slice(1) + '.webp' : t.cover.startsWith('http') ? t.cover : t.coverBase + 'large/' + t.cover) : '';
   if (cov) $('manga-cover').src = cov; else $('manga-cover').classList.add('is-empty');
   $('manga-title').textContent = t.title;
   if (t.alt && t.alt !== t.title) { $('manga-alt-title').textContent = t.alt; $('manga-alt-title').hidden = false; }
@@ -239,6 +306,7 @@ async function loadEnglish(uuid) {
   setupDescription(t.description || '');
   if (t.mangadex) loadEnglish(t.mangadex);
   loadRussian(t);
+  setupCollection(id, cov, t.title);
 })();
 </script>
 </body>
